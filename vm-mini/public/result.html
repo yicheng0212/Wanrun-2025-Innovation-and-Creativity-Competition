@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>交易收據｜循環販賣機</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body class="min-vh-100 d-flex flex-column">
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+    <div class="container">
+      <a class="navbar-brand fw-semibold" href="/index.html"><i class="bi bi-recycle me-2"></i>循環販賣機 DEMO</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="切換導覽">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="mainNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link" href="/index.html">體驗入口</a></li>
+          <li class="nav-item"><a class="nav-link" href="/scan.html">會員掃碼</a></li>
+          <li class="nav-item"><a class="nav-link" href="/shop.html">訪客購物</a></li>
+          <li class="nav-item"><a class="nav-link" href="/checkout.html">結帳確認</a></li>
+          <li class="nav-item"><a class="nav-link" href="/recycle.html">回收端</a></li>
+          <li class="nav-item"><a class="nav-link active" aria-current="page" href="/result.html">交易收據</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <main class="flex-grow-1 d-flex align-items-center">
+    <div class="container py-5">
+      <div class="row justify-content-center">
+        <div class="col-lg-8">
+          <div class="glass-card shadow-lg p-5">
+            <div class="d-flex justify-content-between align-items-start mb-4">
+              <div>
+                <span class="badge bg-info-subtle text-info-emphasis mb-2">Step 4</span>
+                <h1 class="fw-bold text-primary mb-0"><i class="bi bi-receipt-cutoff me-2"></i>交易收據</h1>
+                <small class="text-secondary">快速檢視品項、ESG 成效與後續流程提醒</small>
+              </div>
+              <div id="statusBadge" class="badge text-bg-secondary fs-6"></div>
+            </div>
+            <div id="rec"></div>
+            <div id="dispenseSection" class="mt-4 d-none">
+              <div class="glass-card p-4">
+                <h2 class="h5 text-secondary mb-3"><i class="bi bi-gear-wide-connected me-2"></i>出貨紀錄</h2>
+                <div id="dispenseLogs" class="list-group list-group-flush list-group-animated"></div>
+              </div>
+            </div>
+            <div class="mt-4 d-flex flex-wrap gap-3">
+              <a id="toDispense" class="btn btn-primary btn-lg px-4" style="display:none"><i class="bi bi-gear me-2"></i><span>前往出貨模擬</span></a>
+              <a class="btn btn-outline-primary btn-lg px-4" href="/dashboard.html"><i class="bi bi-bar-chart-line me-2"></i>看 ESG 儀表板</a>
+              <a id="continueShopping" class="btn btn-light btn-lg px-4" href="/shop.html"><i class="bi bi-arrow-left-circle me-2"></i>繼續購物</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="py-4 text-white text-center bg-primary mt-auto">
+    <small>© 2025 循環販賣機 Demo</small>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/assets/app.js"></script>
+  <script>
+    const url = new URL(location.href);
+    const txParam = url.searchParams.get('tx');
+    const $rec = document.getElementById('rec');
+    const $toDispense = document.getElementById('toDispense');
+    const $statusBadge = document.getElementById('statusBadge');
+    const $continueShopping = document.getElementById('continueShopping');
+    const $dispenseSection = document.getElementById('dispenseSection');
+    const $dispenseLogs = document.getElementById('dispenseLogs');
+    const metaStorageKey = `txMeta:${txParam}`;
+    let txMeta = null;
+    try {
+      const raw = sessionStorage.getItem(metaStorageKey);
+      if(raw) txMeta = JSON.parse(raw);
+    } catch (err) {
+      txMeta = null;
+    }
+
+    // 將交易狀態轉換成易讀的中文標籤
+    function presentStatus(status){
+      switch(status){
+        case 'created': return { text:'待付款', color:'text-bg-warning' };
+        case 'paid': return { text:'待出貨', color:'text-bg-success' };
+        case 'dispensing': return { text:'出貨中', color:'text-bg-info' };
+        case 'done': return { text:'已完成', color:'text-bg-primary' };
+        case 'canceled': return { text:'已取消', color:'text-bg-secondary' };
+        default: return { text:'未知', color:'text-bg-dark' };
+      }
+    }
+
+    function renderPaymentMeta(meta){
+      if(!meta) return '';
+      const methodMap = {
+        card: '信用卡 / 簽帳金融卡',
+        cash: '現金付款',
+        line: 'LINE Pay 行動支付'
+      };
+      const pay = meta.payment || {};
+      const invoice = meta.invoice || {};
+      let paymentDetail = '';
+      if(pay.method === 'card'){
+        paymentDetail = `
+          <div class="text-secondary small mt-1">
+            持卡人：${pay.details?.card_holder || '-'}<br>
+            卡號尾號：${pay.details?.card_last4 || '----'}（${pay.details?.card_brand || '信用卡'}）
+          </div>`;
+      } else if(pay.method === 'cash'){
+        paymentDetail = `
+          <div class="text-secondary small mt-1">
+            實收：$${(pay.details?.received ?? 0).toFixed(0)}　找零：$${(pay.details?.change ?? 0).toFixed(0)}
+          </div>`;
+      } else if(pay.method === 'line'){
+        paymentDetail = `
+          <div class="text-secondary small mt-1">
+            綁定手機：${pay.details?.phone || '-'}<br>
+            交易參考：${pay.details?.reference || '-'}
+          </div>`;
+      }
+
+      let invoiceDetail = '';
+      if(invoice.type === 'mobile'){
+        invoiceDetail = `<div class="text-secondary small mt-1">手機載具：${invoice.carrier || '-'}</div>`;
+      } else if(invoice.type === 'company'){
+        invoiceDetail = `<div class="text-secondary small mt-1">統編：${invoice.company_id || '-'}<br>抬頭：${invoice.company_title || '未填寫'}</div>`;
+      } else if(invoice.type === 'paper'){
+        invoiceDetail = `<div class="text-secondary small mt-1">紙本發票已列印隨單附上</div>`;
+      } else if(invoice.type === 'none'){
+        invoiceDetail = `<div class="text-secondary small mt-1">不索取發票，僅保留電子紀錄</div>`;
+      } else {
+        invoiceDetail = `<div class="text-secondary small mt-1">發票資訊：-</div>`;
+      }
+
+      return `
+        <div class="glass-card p-4 mt-4">
+          <h2 class="h5 text-secondary mb-3"><i class="bi bi-credit-card-2-front me-2"></i>付款與發票資訊</h2>
+          <div class="mb-3">
+            <div class="fw-semibold">付款方式：${methodMap[pay.method] || '-'}</div>
+            ${paymentDetail}
+          </div>
+          <div>
+            <div class="fw-semibold">發票 / 載具</div>
+            ${invoiceDetail}
+          </div>
+        </div>
+      `;
+    }
+
+    (async () => {
+      if (!txParam) {
+        $rec.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>缺少交易編號（tx）。</div>';
+        App.bootstrapToast('缺少交易編號', 'danger');
+        return;
+      }
+
+      // 取得交易、品項與會員資訊
+      const r = await fetch(`/api/tx/${txParam}`);
+      const data = await r.json();
+      if (!r.ok) {
+        $rec.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-octagon me-2"></i>${data.error || '找不到交易'}</div>`;
+        App.bootstrapToast(data.error || '找不到交易', 'danger');
+        return;
+      }
+
+      const { tx: t, items, user } = data;
+      const skuNameMap = new Map(items.map(i=>[i.sku_id, i.sku_name]));
+      const statusView = presentStatus(t.status);
+      $statusBadge.textContent = statusView.text;
+      $statusBadge.className = `badge fs-6 ${statusView.color}`;
+      const paymentMetaHtml = renderPaymentMeta(txMeta);
+
+      $rec.innerHTML = `
+        <div class="bg-light rounded-4 p-4 mb-4">
+          <div class="d-flex flex-wrap gap-3 align-items-center">
+            <div class="timeline-dot"></div>
+            <div>
+              <div class="text-secondary small">交易編號</div>
+              <div class="fw-semibold">${t.id}</div>
+            </div>
+            ${user ? `
+              <div>
+                <div class="text-secondary small">會員資訊</div>
+                <div class="fw-semibold">${user.name || '訪客'}（${user.mem_no}）</div>
+              </div>` : ''
+            }
+            <div>
+              <div class="text-secondary small">建立時間</div>
+              <div>${new Date(t.created_at).toLocaleString()}</div>
+            </div>
+          </div>
+        </div>
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-header bg-primary text-white">
+            <i class="bi bi-basket me-2"></i>購買明細
+          </div>
+          <div class="card-body p-0">
+            <div class="list-group list-group-flush">
+              ${items.map(i=>`
+                <div class="list-group-item py-3">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                      <div class="fw-semibold">${i.sku_name}</div>
+                      <small class="text-secondary">數量 ${i.qty} ｜ 單價 $${(i.unit_price_cents/100).toFixed(0)}${i.deposit_cents>0?' ＋押金':''}</small>
+                    </div>
+                    <div class="fw-semibold text-primary">$${( (i.unit_price_cents + i.deposit_cents) * i.qty / 100).toFixed(0)}</div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          <div class="card-footer bg-light">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="text-secondary">押金合計</span>
+              <span class="fw-semibold">$${(t.deposit_total_cents/100).toFixed(0)}</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="fw-semibold">商品＋押金總計</span>
+              <span class="display-6 fw-bold text-primary">$${(t.total_cents/100).toFixed(0)}</span>
+            </div>
+          </div>
+        </div>
+        <div class="alert alert-success d-flex align-items-center gap-3 mb-3" role="alert">
+          <i class="bi bi-tree fs-2"></i>
+          <div>
+            <div class="fw-semibold">本次 ESG 成效</div>
+            <div>減碳 ${(+t.carbon_saving).toFixed(3)} kg CO₂e、節水 ${(+t.water_saving).toFixed(1)} L</div>
+          </div>
+        </div>
+        <div class="alert alert-secondary mb-0">
+          <i class="bi bi-gear-wide-connected me-2"></i>下一步可前往出貨頁模擬「成功／卡貨／缺貨」，系統將依結果記錄退款與押金流。
+          ${t.tx_refund_cents ? `<div class="mt-2 text-secondary small"><i class="bi bi-cash-coin me-1"></i>退款金額：$${(t.tx_refund_cents/100).toFixed(0)}</div>` : ''}
+        </div>
+        ${paymentMetaHtml}
+      `;
+
+      // 調整出貨按鈕顯示邏輯
+      if (['paid','dispensing','done'].includes(t.status)) {
+        $toDispense.href = `/dispense.html?tx=${encodeURIComponent(txParam)}`;
+        if (t.status === 'done') {
+          $toDispense.querySelector('span').textContent = '查看出貨日誌';
+        }
+        $toDispense.style.display = 'inline-flex';
+      }
+
+      if (user) {
+        $continueShopping.href = `/shop.html?mem=${encodeURIComponent(user.mem_no)}`;
+      }
+
+      // 若交易已進入出貨階段，額外載入日誌呈現
+      if (['dispensing','done'].includes(t.status)) {
+        try{
+          const logRes = await fetch(`/api/dispense/${txParam}`);
+          const logData = await logRes.json();
+          if(logRes.ok && Array.isArray(logData.logs) && logData.logs.length){
+            const logs = logData.logs;
+            $dispenseLogs.innerHTML = logs.map(log=>{
+              const label = skuNameMap.get(log.sku_id) || log.sku_id;
+              const badgeClass = log.result==='success' ? 'text-bg-success' : (log.result==='jam' ? 'text-bg-warning' : 'text-bg-danger');
+              return `
+              <div class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
+                <div>
+                  <div class="fw-semibold">${label}</div>
+                  <small class="text-secondary">料道 ${log.lane_no ?? '-'} ｜ 嘗試 ${log.attempt_no}</small>
+                </div>
+                <span class="badge ${badgeClass}">${log.result}</span>
+              </div>`;
+            }).join('');
+            $dispenseSection.classList.remove('d-none');
+          }
+        } catch(err){
+          console.error(err);
+        }
+      }
+      if(txMeta){
+        sessionStorage.removeItem(metaStorageKey);
+      }
+    })();
+  </script>
+</body>
+</html>

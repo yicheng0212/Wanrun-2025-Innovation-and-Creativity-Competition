@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>三段式結帳｜循環販賣機</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body class="min-vh-100 d-flex flex-column">
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+    <div class="container">
+      <a class="navbar-brand fw-semibold" href="/index.html"><i class="bi bi-recycle me-2"></i>循環販賣機 DEMO</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="切換導覽">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="mainNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link" href="/scan.html">會員掃描</a></li>
+          <li class="nav-item"><a class="nav-link" href="/shop.html">訪客購物</a></li>
+          <li class="nav-item"><a class="nav-link active" aria-current="page" href="/checkout.html">三段式結帳</a></li>
+          <li class="nav-item"><a class="nav-link" href="/recycle.html">回收端</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <main class="flex-grow-1 d-flex align-items-center">
+    <div class="container py-5">
+      <div class="row justify-content-center">
+        <div class="col-xl-9">
+          <div class="glass-card p-5 shadow-lg checkout-shell">
+            <div class="d-flex flex-column flex-lg-row justify-content-between gap-4">
+              <div>
+                <span class="badge bg-warning-subtle text-warning-emphasis mb-3">Step 3</span>
+                <h1 class="fw-bold text-white mb-2"><i class="bi bi-wallet2 me-2"></i>三段式結帳流程</h1>
+                <p class="text-secondary mb-0">依序完成「金額確認 → 付款 → 發票」三個畫面，模擬真實販賣機掃碼逐步前進的體驗。</p>
+              </div>
+              <div class="text-lg-end">
+                <div class="step-bubbles mb-3 justify-content-lg-end">
+                  <div class="step-bubble active" data-step="summary" data-label="金額">1</div>
+                  <div class="step-bubble" data-step="payment" data-label="付款">2</div>
+                  <div class="step-bubble" data-step="invoice" data-label="發票">3</div>
+                </div>
+                <div class="step-status-text" id="stepHint">請確認購物明細後按下一步進入付款</div>
+              </div>
+            </div>
+
+            <hr class="my-4">
+
+            <div id="loading" class="glass-ring text-secondary gap-2">
+              <span class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span>
+              <span>建立交易中...</span>
+            </div>
+
+            <div id="emptyCart" class="alert alert-secondary d-none mt-3" role="alert">
+              <i class="bi bi-basket me-2"></i>購物車目前為空，請返回選購循環飲品。
+              <a class="btn btn-link btn-sm" href="/shop.html"><i class="bi bi-arrow-return-left me-1"></i>回商品頁</a>
+            </div>
+
+            <div id="error" class="alert alert-danger d-none mt-3" role="alert"></div>
+
+            <div id="checkoutContent" class="checkout-flow d-none">
+              <div id="memberInfo" class="mb-3"></div>
+
+              <section class="checkout-step active" data-step="summary">
+                <div class="row g-4">
+                  <div class="col-xl-7">
+                    <div class="glass-card p-4 h-100">
+                      <h2 class="h5 text-secondary mb-3"><i class="bi bi-bag-heart me-2"></i>購物明細</h2>
+                      <ul id="summaryList" class="list-group list-group-flush list-group-animated mb-0"></ul>
+                    </div>
+                  </div>
+                  <div class="col-xl-5">
+                    <div class="glass-card p-4 h-100">
+                      <h2 class="h5 text-secondary mb-3"><i class="bi bi-receipt me-2"></i>金額總覽</h2>
+                      <div class="d-flex justify-content-between mb-2">
+                        <span class="text-secondary">商品＋押金合計</span>
+                        <span id="totalText" class="value-lg text-primary">-</span>
+                      </div>
+                      <div class="text-secondary small mb-3">押金合計：<span id="depositText" class="fw-semibold text-warning-emphasis">-</span></div>
+                      <div id="esgBlock" class="glass-card p-3 d-none">
+                        <div class="fw-semibold text-success">本次 ESG 成效</div>
+                        <small id="esgText"></small>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="step-nav">
+                  <span></span>
+                  <button class="btn btn-outline-light" data-next="payment"><i class="bi bi-arrow-right-circle me-2"></i>確認金額並前往付款</button>
+                </div>
+              </section>
+
+              <section class="checkout-step" data-step="payment">
+                <div class="glass-card p-4 mb-4 checkout-amount-card">
+                  <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center">
+                    <div>
+                      <div class="text-secondary small">應付金額 (含押金)</div>
+                      <div class="value-lg text-primary" id="paymentDue">$0</div>
+                    </div>
+                    <div>
+                      <div class="text-secondary small">押金合計</div>
+                      <div class="value-lg text-warning-emphasis" id="paymentDeposit">$0</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="row g-4">
+                  <div class="col-xl-7">
+                    <div class="glass-card p-4 h-100">
+                      <h2 class="h5 text-secondary mb-3"><i class="bi bi-credit-card-2-front me-2"></i>選擇付款方式</h2>
+                      <div class="vstack gap-2 mb-3">
+                        <label class="glass-ring text-primary">
+                          <input class="form-check-input me-2" type="radio" name="paymentMethod" value="card" checked>
+                          <span>信用卡（晶片＋簽名）</span>
+                        </label>
+                        <label class="glass-ring text-secondary">
+                          <input class="form-check-input me-2" type="radio" name="paymentMethod" value="line">
+                          <span>LINE Pay</span>
+                        </label>
+                        <label class="glass-ring text-secondary">
+                          <input class="form-check-input me-2" type="radio" name="paymentMethod" value="cash">
+                          <span>現金（自動找零）</span>
+                        </label>
+                      </div>
+
+                      <div id="cardFields" class="glass-card p-3">
+                        <div class="row g-3">
+                          <div class="col-12">
+                            <label class="form-label" for="cardName">持卡人姓名</label>
+                            <input id="cardName" class="form-control" placeholder="例如：CHEN T Y">
+                          </div>
+                          <div class="col-12">
+                            <label class="form-label" for="cardNumber">卡號</label>
+                            <input id="cardNumber" class="form-control" placeholder="0000 0000 0000 0000" inputmode="numeric">
+                          </div>
+                          <div class="col-md-6">
+                            <label class="form-label" for="cardExpiry">有效期限 (MM/YY)</label>
+                            <input id="cardExpiry" class="form-control" placeholder="08/27" inputmode="numeric">
+                          </div>
+                          <div class="col-md-6">
+                            <label class="form-label" for="cardCvc">安全碼</label>
+                            <input id="cardCvc" class="form-control" placeholder="123" inputmode="numeric">
+                          </div>
+                        </div>
+                      </div>
+
+                      <div id="cashFields" class="glass-card p-3 d-none">
+                        <label class="form-label" for="cashAmount">實收金額 (NTD)</label>
+                        <input id="cashAmount" type="number" min="0" step="10" class="form-control" placeholder="請輸入客戶付款金額">
+                        <small class="text-secondary d-block mt-2">應付金額：$<span id="cashDue">0</span></small>
+                        <small id="cashChangeResult" class="text-success d-none mt-1"></small>
+                      </div>
+
+                      <div id="lineFields" class="glass-card p-3 d-none">
+                        <label class="form-label" for="linePhone">掃描 LINE Pay 條碼</label>
+                        <input id="linePhone" class="form-control" placeholder="請掃描或輸入付款碼" autocomplete="off">
+                        <small class="text-secondary d-block mt-2">掃描完成後自動進入發票設定。</small>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-xl-5">
+                    <div class="glass-card p-4 h-100">
+                      <h2 class="h5 text-secondary mb-3"><i class="bi bi-lightning-charge me-2"></i>付款提示</h2>
+                      <ul class="text-secondary small mb-0 ps-3">
+                        <li>信用卡依序輸入卡號資訊即可。</li>
+                        <li>現金付款會自動計算找零金額。</li>
+                        <li>LINE Pay 請直接掃描付款條碼，讀取後自動前往下一步。</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+                <div class="step-nav">
+                  <button class="btn btn-outline-secondary" data-step-back><i class="bi bi-arrow-left-circle me-2"></i>返回金額</button>
+                  <button class="btn btn-primary" data-next="invoice"><i class="bi bi-receipt me-2"></i>下一步：發票</button>
+                </div>
+              </section>
+
+              <section class="checkout-step" data-step="invoice">
+                <div class="glass-card p-4 mb-4 checkout-amount-card">
+                  <div class="row g-4">
+                    <div class="col-sm-6">
+                      <div class="text-secondary small">應付金額 (含押金)</div>
+                      <div class="value-lg text-primary" id="invoiceDue">$0</div>
+                    </div>
+                    <div class="col-sm-6">
+                      <div class="text-secondary small">押金合計</div>
+                      <div class="value-lg text-warning-emphasis" id="invoiceDeposit">$0</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="row g-4">
+                  <div class="col-xl-6">
+                    <div class="glass-card p-4 h-100">
+                      <h2 class="h5 text-secondary mb-3"><i class="bi bi-receipt-cutoff me-2"></i>發票 / 載具</h2>
+                      <div class="vstack gap-2">
+                        <label class="form-check glass-ring text-secondary">
+                          <input class="form-check-input me-2" type="radio" name="invoiceType" id="invoicePaper" value="paper">
+                          <span>紙本發票（列印收據）</span>
+                        </label>
+                        <label class="form-check glass-ring text-secondary">
+                          <input class="form-check-input me-2" type="radio" name="invoiceType" id="invoiceNone" value="none">
+                          <span>不索取發票（僅留交易紀錄）</span>
+                        </label>
+                        <label class="form-check glass-ring text-secondary">
+                          <input class="form-check-input me-2" type="radio" name="invoiceType" id="invoiceMobile" value="mobile">
+                          <span>手機載具</span>
+                        </label>
+                        <label class="form-check glass-ring text-secondary">
+                          <input class="form-check-input me-2" type="radio" name="invoiceType" id="invoiceCompany" value="company">
+                          <span>統一編號（三聯式）</span>
+                        </label>
+                      </div>
+
+                      <div id="invoiceMobileFields" class="glass-card p-3 mt-3 d-none">
+                        <label class="form-label" for="invoiceCarrier">手機載具條碼</label>
+                        <input id="invoiceCarrier" class="form-control" placeholder="掃描 /AB12345" autocomplete="off">
+                        <small class="text-secondary d-block mt-2">掃描條碼後立即完成交易。</small>
+                      </div>
+
+                      <div id="invoiceCompanyFields" class="glass-card p-3 mt-3 d-none">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                          <label class="form-label mb-0" for="invoiceCompany">統一編號</label>
+                          <button type="button" class="btn btn-outline-secondary btn-sm" id="companyClear">清除</button>
+                        </div>
+                        <input id="invoiceCompany" class="form-control d-none" maxlength="8" autocomplete="off">
+                        <div class="company-display" id="companyDisplay">--------</div>
+                        <div class="company-keypad" id="companyKeypad">
+                          <button type="button" data-key="1">1</button>
+                          <button type="button" data-key="2">2</button>
+                          <button type="button" data-key="3">3</button>
+                          <button type="button" data-key="4">4</button>
+                          <button type="button" data-key="5">5</button>
+                          <button type="button" data-key="6">6</button>
+                          <button type="button" data-key="7">7</button>
+                          <button type="button" data-key="8">8</button>
+                          <button type="button" data-key="9">9</button>
+                          <button type="button" data-action="back" class="alt">刪除</button>
+                          <button type="button" data-key="0">0</button>
+                          <button type="button" data-action="ok" id="companyOk" class="accent">OK</button>
+                        </div>
+                        <small class="text-secondary d-block mt-2">輸入 8 碼數字並按 OK，即可完成交易。</small>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-xl-6">
+                    <div class="glass-card p-4 h-100">
+                      <h2 class="h5 text-secondary mb-3"><i class="bi bi-activity me-2"></i>交易狀態</h2>
+                      <div class="d-flex flex-wrap gap-3 align-items-center justify-content-between">
+                        <div class="d-flex align-items-center gap-3 text-secondary">
+                          <div class="spinner-border text-primary d-none" id="loadingSpinner" role="status" aria-hidden="true"></div>
+                          <div>
+                            <div class="fw-semibold">系統訊息</div>
+                            <small id="statusText" class="text-secondary">建立交易中…</small>
+                          </div>
+                        </div>
+                        <div class="d-flex gap-2" id="actions" style="display:none">
+                          <button id="payFail" class="btn btn-outline-danger btn-lg"><i class="bi bi-x-circle me-2"></i>取消交易</button>
+                          <button id="payOk" class="btn btn-primary btn-lg"><i class="bi bi-check-circle me-2"></i>模擬支付成功</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="step-nav">
+                  <button class="btn btn-outline-secondary" data-step-back><i class="bi bi-arrow-left-circle me-2"></i>返回付款</button>
+                  <span></span>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="py-4 text-white text-center bg-primary mt-auto">
+    <small>© 2025 循環販賣機 Demo</small>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/assets/app.js"></script>
+  <script>
+    const url = new URL(location.href);
+    const mem = url.searchParams.get('mem') || '';
+    const CART_KEY = 'cart:' + (mem || 'guest');
+    const cart = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
+    let txId = null;
+    let currentTotalCents = 0;
+    let currentDepositCents = 0;
+    let pendingMetaPayload = null;
+
+    const $summaryList = document.getElementById('summaryList');
+    const $totalText = document.getElementById('totalText');
+    const $depositText = document.getElementById('depositText');
+    const $esgText = document.getElementById('esgText');
+    const $esgBlock = document.getElementById('esgBlock');
+    const $actions = document.getElementById('actions');
+    const $loading = document.getElementById('loading');
+    const $loadingSpinner = document.getElementById('loadingSpinner');
+    const $statusText = document.getElementById('statusText');
+    const $memberInfo = document.getElementById('memberInfo');
+    const $checkoutContent = document.getElementById('checkoutContent');
+    const $emptyCart = document.getElementById('emptyCart');
+    const $error = document.getElementById('error');
+    const $paymentDue = document.getElementById('paymentDue');
+    const $paymentDeposit = document.getElementById('paymentDeposit');
+    const $invoiceDue = document.getElementById('invoiceDue');
+    const $invoiceDeposit = document.getElementById('invoiceDeposit');
+    const $stepHint = document.getElementById('stepHint');
+
+    const paymentMethodRadios = document.querySelectorAll('input[name="paymentMethod"]');
+    const paymentSections = {
+      card: document.getElementById('cardFields'),
+      cash: document.getElementById('cashFields'),
+      line: document.getElementById('lineFields')
+    };
+    const cardNameInput = document.getElementById('cardName');
+    const cardNumberInput = document.getElementById('cardNumber');
+    const cardExpiryInput = document.getElementById('cardExpiry');
+    const cardCvcInput = document.getElementById('cardCvc');
+    const cashAmountInput = document.getElementById('cashAmount');
+    const cashDueSpan = document.getElementById('cashDue');
+    const cashChangeResult = document.getElementById('cashChangeResult');
+    const linePhoneInput = document.getElementById('linePhone');
+    const invoiceTypeRadios = document.querySelectorAll('input[name="invoiceType"]');
+    const invoiceSections = {
+      mobile: document.getElementById('invoiceMobileFields'),
+      company: document.getElementById('invoiceCompanyFields')
+    };
+    const invoiceCarrierInput = document.getElementById('invoiceCarrier');
+    const invoiceCompanyInput = document.getElementById('invoiceCompany');
+    const companyDisplay = document.getElementById('companyDisplay');
+    const companyKeypad = document.getElementById('companyKeypad');
+    const companyClearBtn = document.getElementById('companyClear');
+    const companyOkBtn = document.getElementById('companyOk');
+
+    const nextToInvoiceBtn = document.querySelector('[data-next="invoice"]');
+
+    const stepOrder = ['summary','payment','invoice'];
+    const stepBubbles = Array.from(document.querySelectorAll('.step-bubble'));
+    let currentStepIndex = 0;
+    let companyBuffer = '';
+    let finishingCheckout = false;
+
+    paymentMethodRadios.forEach(radio=>{
+      radio.addEventListener('change', updatePaymentSections);
+    });
+
+    invoiceTypeRadios.forEach(radio=>{
+      radio.addEventListener('change', ()=>updateInvoiceSections(true));
+    });
+
+    cardNumberInput.addEventListener('input', ()=>{
+      cardNumberInput.value = formatCardNumber(cardNumberInput.value);
+    });
+
+    cardExpiryInput.addEventListener('input', ()=>{
+      cardExpiryInput.value = formatExpiry(cardExpiryInput.value);
+    });
+
+    invoiceCarrierInput.addEventListener('input', ()=>{
+      let raw = invoiceCarrierInput.value.toUpperCase().replace(/[^A-Z0-9.+-]/g,'');
+      invoiceCarrierInput.value = raw.length === 0 ? '' : '/' + raw.slice(0,7);
+    });
+    invoiceCarrierInput.addEventListener('keydown', event=>{
+      if(event.key === 'Enter'){
+        event.preventDefault();
+        completeInvoiceIfReady('mobile');
+      }
+    });
+    linePhoneInput.addEventListener('input', ()=>{
+      linePhoneInput.value = linePhoneInput.value.slice(0,32);
+      refreshPaymentNextButton();
+    });
+    linePhoneInput.addEventListener('keydown', event=>{
+      if(event.key === 'Enter'){
+        event.preventDefault();
+        handleLineScan(linePhoneInput.value);
+      }
+    });
+
+    cashAmountInput.addEventListener('input', ()=>{
+      const amount = parseFloat(cashAmountInput.value);
+      const total = currentTotalCents / 100;
+      if(Number.isNaN(amount) || amount < total){
+        cashChangeResult.classList.add('d-none');
+        cashChangeResult.textContent = '';
+        return;
+      }
+      const change = amount - total;
+      cashChangeResult.textContent = `找零金額：$${change.toFixed(0)}`;
+      cashChangeResult.classList.remove('d-none');
+    });
+
+    if(companyClearBtn){
+      companyClearBtn.addEventListener('click', ()=>{
+        companyBuffer = '';
+        syncCompanyInput();
+      });
+    }
+
+    if(companyKeypad){
+      companyKeypad.addEventListener('click', event=>{
+        const btn = event.target.closest('button');
+        if(!btn) return;
+        const key = btn.dataset.key;
+        const action = btn.dataset.action;
+        if(key){
+          if(companyBuffer.length >= 8) return;
+          companyBuffer += key;
+          syncCompanyInput();
+        } else if(action === 'back'){
+          companyBuffer = companyBuffer.slice(0, -1);
+          syncCompanyInput();
+        } else if(action === 'ok'){
+          completeInvoiceIfReady('company');
+        }
+      });
+    }
+
+    if(companyOkBtn){
+      companyOkBtn.addEventListener('click', event=>{
+        event.preventDefault();
+        event.stopPropagation();
+        completeInvoiceIfReady('company');
+      });
+    }
+
+    if(linePhoneInput){
+      App.attachScanHandler('#linePhone', handleLineScan, { autoTrigger:true, skipEmpty:true });
+    }
+
+    if(invoiceCarrierInput){
+      App.attachScanHandler('#invoiceCarrier', handleInvoiceCarrierScan, { autoTrigger:true, skipEmpty:true });
+    }
+
+    syncCompanyInput();
+
+    updatePaymentSections();
+    updateInvoiceSections();
+    setupStepNav();
+
+    function updateAmountDisplays(){
+      const total = (currentTotalCents/100).toFixed(0);
+      const deposit = (currentDepositCents/100).toFixed(0);
+      if($paymentDue) $paymentDue.textContent = `$${total}`;
+      if($paymentDeposit) $paymentDeposit.textContent = `$${deposit}`;
+      if($invoiceDue) $invoiceDue.textContent = `$${total}`;
+      if($invoiceDeposit) $invoiceDeposit.textContent = `$${deposit}`;
+      cashDueSpan.textContent = total;
+    }
+
+    function updateStepHint(stepName){
+      if(!$stepHint) return;
+      const hints = {
+        summary: '請確認購物明細後按下下一步進入付款',
+        payment: 'LINE Pay 掃描條碼即可前往發票，其餘付款可直接下一步',
+        invoice: '選擇發票方式即可完成；手機／統編需輸入後自動結束'
+      };
+      $stepHint.textContent = hints[stepName] || '';
+    }
+
+    function goToStep(stepName){
+      const idx = stepOrder.indexOf(stepName);
+      if(idx === -1) return;
+      currentStepIndex = idx;
+      document.querySelectorAll('.checkout-step').forEach(section=>{
+        section.classList.toggle('active', section.dataset.step === stepName);
+      });
+      stepBubbles.forEach(bubble=>{
+        const bubbleIdx = stepOrder.indexOf(bubble.dataset.step);
+        bubble.classList.toggle('active', bubbleIdx === idx);
+        bubble.classList.toggle('completed', bubbleIdx < idx);
+      });
+      updateStepHint(stepName);
+      focusScanner(stepName);
+      if(stepName === 'payment'){
+        updatePaymentSections();
+      }
+      if(stepName === 'invoice'){
+        updateInvoiceSections();
+      }
+    }
+
+    function focusScanner(stepName){
+      const el = document.querySelector(`[data-scan-step="${stepName}"]`);
+      if(el){
+        setTimeout(()=>el.focus(), 180);
+      }
+    }
+
+    function setupStepNav(){
+      document.querySelectorAll('[data-next]').forEach(btn=>{
+        btn.addEventListener('click', ()=>handleNext(btn.dataset.next));
+      });
+      document.querySelectorAll('[data-step-back]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const prevIdx = Math.max(0, currentStepIndex - 1);
+          goToStep(stepOrder[prevIdx]);
+        });
+      });
+    }
+
+    function handleNext(target){
+      if(target === 'payment'){
+        if(!txId){
+          App.bootstrapToast('交易尚未建立', 'warning');
+          return;
+        }
+        goToStep('payment');
+        return;
+      }
+      if(target === 'invoice'){
+        const method = getSelectedPaymentMethod();
+        if(method === 'line' && !linePhoneInput.value.trim()){
+          App.bootstrapToast('請先掃描 LINE Pay 條碼', 'warning');
+          App.autoFocus('#linePhone');
+          return;
+        }
+        const check = validatePayment();
+        if(!check.ok){
+          App.bootstrapToast(check.message, 'warning');
+          return;
+        }
+        goToStep('invoice');
+      }
+    }
+
+    function getSelectedPaymentMethod(){
+      return document.querySelector('input[name="paymentMethod"]:checked')?.value || '';
+    }
+
+    function updatePaymentSections(){
+      const method = getSelectedPaymentMethod();
+      Object.entries(paymentSections).forEach(([key, el])=>{
+        if(!el) return;
+        el.classList.toggle('d-none', method !== key);
+      });
+      if(method !== 'cash'){
+        cashChangeResult.classList.add('d-none');
+        cashChangeResult.textContent = '';
+      }
+      const isLine = method === 'line';
+      if(isLine && linePhoneInput){
+        linePhoneInput.value = '';
+        App.autoFocus('#linePhone');
+      }
+      refreshPaymentNextButton();
+    }
+
+    function refreshPaymentNextButton(){
+      if(!nextToInvoiceBtn) return;
+      const method = getSelectedPaymentMethod();
+      const hasLineCode = linePhoneInput && linePhoneInput.value.trim().length >= 6;
+      const disable = method === 'line' && !hasLineCode;
+      nextToInvoiceBtn.disabled = disable;
+      nextToInvoiceBtn.classList.toggle('disabled', disable);
+      nextToInvoiceBtn.innerHTML = disable
+        ? '<i class="bi bi-upc-scan me-2"></i>等待 LINE Pay 條碼'
+        : '<i class="bi bi-receipt me-2"></i>下一步：發票';
+    }
+
+    function formatCardNumber(value){
+      return value.replace(/\D/g,'').slice(0,16).replace(/(\d{4})(?=\d)/g,'$1 ');
+    }
+
+    function formatExpiry(value){
+      const digits = value.replace(/\D/g,'').slice(0,4);
+      if(digits.length < 3) return digits;
+      return `${digits.slice(0,2)}/${digits.slice(2)}`;
+    }
+
+    function getInvoiceType(){
+      const selected = document.querySelector('input[name="invoiceType"]:checked');
+      return selected ? selected.value : 'paper';
+    }
+
+    function updateInvoiceSections(autoTrigger = false){
+      const selected = document.querySelector('input[name="invoiceType"]:checked');
+      const type = selected ? selected.value : null;
+      Object.entries(invoiceSections).forEach(([key, el])=>{
+        if(!el) return;
+        el.classList.toggle('d-none', type !== key);
+      });
+      if(!(autoTrigger && type)) return;
+      const onInvoiceStep = currentStepIndex === stepOrder.indexOf('invoice');
+      if(!onInvoiceStep) return;
+      if(type === 'paper' || type === 'none'){
+        completeInvoiceIfReady(type);
+      } else if(type === 'mobile'){
+        if(invoiceCarrierInput){
+          invoiceCarrierInput.value = '';
+          App.autoFocus('#invoiceCarrier');
+        }
+      } else if(type === 'company'){
+        companyBuffer = '';
+        syncCompanyInput();
+      }
+    }
+
+    function syncCompanyInput(){
+      if(!invoiceCompanyInput || !companyDisplay) return;
+      invoiceCompanyInput.value = companyBuffer;
+      const padded = (companyBuffer + '--------').slice(0,8);
+      companyDisplay.textContent = padded;
+    }
+
+    function proceedToInvoiceFromLine(){
+      const check = validatePayment();
+      if(!check.ok){
+        App.bootstrapToast(check.message, 'warning');
+        return;
+      }
+      goToStep('invoice');
+    }
+
+    function handleLineScan(value){
+      if(!linePhoneInput) return;
+      const code = (value || '').trim();
+      if(!code) return;
+      linePhoneInput.value = code.slice(0,32);
+      App.bootstrapToast('已讀取 LINE Pay 條碼', 'success');
+      refreshPaymentNextButton();
+      proceedToInvoiceFromLine();
+    }
+
+    function handleInvoiceCarrierScan(value){
+      if(!invoiceCarrierInput) return;
+      const raw = (value || '').toUpperCase().replace(/[^A-Z0-9.+-]/g,'');
+      if(!raw) return;
+      invoiceCarrierInput.value = '/' + raw.slice(0,7);
+      App.bootstrapToast('已取得手機載具', 'success');
+      completeInvoiceIfReady('mobile');
+    }
+
+    function completeInvoiceIfReady(trigger){
+      const check = validateInvoice();
+      if(!check.ok){
+        if(trigger !== 'paper' && trigger !== 'none'){
+          App.bootstrapToast(check.message, 'warning');
+        }
+        return;
+      }
+      confirmPayment('success');
+    }
+
+    function validatePayment(){
+      const method = getSelectedPaymentMethod();
+      if(!method) return { ok:false, message:'請先選擇付款方式' };
+      if(method === 'card'){
+        const name = cardNameInput.value.trim();
+        const number = cardNumberInput.value.replace(/\s+/g,'');
+        const expiry = cardExpiryInput.value.trim();
+        const cvc = cardCvcInput.value.trim();
+        if(!name) return { ok:false, message:'請輸入持卡人姓名' };
+        if(!/^\d{16}$/.test(number)) return { ok:false, message:'請輸入 16 位數的信用卡卡號' };
+        if(!/^(0[1-9]|1[0-2])\/([0-9]{2})$/.test(expiry)) return { ok:false, message:'請輸入正確的卡片有效期限 (MM/YY)' };
+        if(!/^\d{3,4}$/.test(cvc)) return { ok:false, message:'請輸入 3~4 位數安全碼' };
+      } else if(method === 'cash'){
+        const amount = parseFloat(cashAmountInput.value);
+        const total = currentTotalCents / 100;
+        if(Number.isNaN(amount)) return { ok:false, message:'請輸入顧客實付金額' };
+        if(amount < total) return { ok:false, message:`實付金額不可低於應付金額 $${total.toFixed(0)}` };
+      } else if(method === 'line'){
+        const code = linePhoneInput.value.trim();
+        if(code.length < 6) return { ok:false, message:'請先掃描或輸入有效的 LINE Pay 條碼' };
+      }
+      return { ok:true };
+    }
+
+    function validateInvoice(){
+      const type = getInvoiceType();
+      if(type === 'mobile'){
+        const carrier = invoiceCarrierInput.value.trim().toUpperCase();
+        if(!/^\/[A-Z0-9.+-]{7}$/.test(carrier)) return { ok:false, message:'手機載具須為 "/" 開頭＋7 碼英數符號（例：/AB12345）' };
+      } else if(type === 'company'){
+        const company = invoiceCompanyInput.value.trim();
+        if(!/^\d{8}$/.test(company)) return { ok:false, message:'統編需為 8 碼數字' };
+      }
+      return { ok:true };
+    }
+
+    function detectCardBrand(number){
+      if(number.startsWith('4')) return 'VISA';
+      if(/^5[1-5]/.test(number)) return 'Mastercard';
+      if(number.startsWith('3')) return 'JCB/Amex';
+      return '信用卡';
+    }
+
+    function collectPaymentMeta(){
+      const method = getSelectedPaymentMethod();
+      const meta = { method, details:{} };
+      if(method === 'card'){
+        const number = cardNumberInput.value.replace(/\s+/g,'');
+        meta.details = {
+          card_holder: cardNameInput.value.trim(),
+          card_last4: number.slice(-4),
+          card_brand: detectCardBrand(number)
+        };
+      } else if(method === 'cash'){
+        const amount = parseFloat(cashAmountInput.value) || 0;
+        const change = amount - currentTotalCents/100;
+        meta.details = {
+          received: amount,
+          change: Math.max(0, Number(change.toFixed(0)))
+        };
+      } else if(method === 'line'){
+        const phone = linePhoneInput.value.trim();
+        meta.details = {
+          phone,
+          reference: `LP-${phone.slice(-4)}-${Date.now().toString().slice(-4)}`
+        };
+      }
+      return meta;
+    }
+
+    function collectInvoiceMeta(){
+      const type = getInvoiceType();
+      const invoice = { type };
+      if(type === 'mobile'){
+        invoice.carrier = invoiceCarrierInput.value.trim().toUpperCase();
+      } else if(type === 'company'){
+        invoice.company_id = invoiceCompanyInput.value.trim();
+      } else if(type === 'paper'){
+        invoice.paper_printed = true;
+      } else if(type === 'none'){
+        invoice.note = 'no_invoice';
+      }
+      return invoice;
+    }
+
+    function collectMeta(){
+      return {
+        created_at: new Date().toISOString(),
+        total_cents: currentTotalCents,
+        payment: collectPaymentMeta(),
+        invoice: collectInvoiceMeta()
+      };
+    }
+
+    function renderSummary(cartItems, skuMap){
+      $summaryList.innerHTML = cartItems.map(item=>{
+        const sku = skuMap[item.sku_id];
+        if(!sku) return '';
+        const unitTotal = ((sku.price_cents + sku.deposit_cents)/100 * item.qty).toFixed(0);
+        return `
+          <li class="list-group-item bg-transparent px-0 py-3">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <div class="fw-semibold">${sku.name}</div>
+                <small class="text-secondary">數量 ${item.qty} ｜ 單價 $${(sku.price_cents/100).toFixed(0)}${sku.deposit_cents>0 ? ' ｜ 含押金' : ''}</small>
+              </div>
+              <div class="fw-semibold text-primary">$${unitTotal}</div>
+            </div>
+          </li>`;
+      }).join('');
+    }
+
+    async function fetchMember(){
+      if(!mem) {
+        $memberInfo.innerHTML = `<div class="glass-ring text-secondary"><i class="bi bi-incognito me-2"></i>訪客模式：結帳成功後仍可於收據頁綁定會員卡</div>`;
+        return;
+      }
+      try{
+        const r = await fetch('/api/members/resolve',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ mem_no: mem })
+        });
+        const data = await r.json();
+        if(r.ok){
+          $memberInfo.innerHTML = `
+            <div class="glass-ring text-success">
+              <i class="bi bi-person-badge me-2"></i>${data.name || '訪客'}（${data.mem_no}）
+              <span class="ms-3 text-secondary small">押金 ${(data.deposit_balance_cents/100).toFixed(0)} 元｜點數 ${data.points}</span>
+            </div>`;
+        } else {
+          $memberInfo.innerHTML = `<div class="glass-ring text-danger"><i class="bi bi-exclamation-circle me-1"></i>${data.error || '會員資料取得失敗'}</div>`;
+        }
+      } catch(err){
+        console.error(err);
+        $memberInfo.innerHTML = `<div class="glass-ring text-danger"><i class="bi bi-exclamation-triangle me-1"></i>會員資料取得失敗</div>`;
+      }
+    }
+
+    if(cart.length === 0){
+      $loading.classList.add('d-none');
+      $emptyCart.classList.remove('d-none');
+    }
+
+    (async()=>{
+      if(cart.length === 0) return;
+      await fetchMember();
+      try{
+        const skuList = await (await fetch('/api/sku')).json();
+        const skuMap = Object.fromEntries(skuList.map(item => [item.id, item]));
+
+        renderSummary(cart, skuMap);
+
+        const txRes = await fetch('/api/tx',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ mem_no: mem || null, items: cart })
+        });
+        const txData = await txRes.json();
+        if(!txRes.ok) throw new Error(txData.error || '建立交易失敗');
+
+        txId = txData.tx_id;
+        currentTotalCents = txData.total_cents || 0;
+        currentDepositCents = txData.deposit_total_cents || 0;
+        $totalText.textContent = `$${(currentTotalCents/100).toFixed(0)}`;
+        $depositText.textContent = `$${(currentDepositCents/100).toFixed(0)}`;
+        $esgText.textContent = `減碳 ${txData.carbon_saving} kg CO₂e、節水 ${txData.water_saving} L`;
+        $esgBlock.classList.remove('d-none');
+        updateAmountDisplays();
+
+        $loading.classList.add('d-none');
+        $checkoutContent.classList.remove('d-none');
+        $actions.style.display = 'flex';
+        $statusText.textContent = '等待付款確認';
+        goToStep('summary');
+      } catch(err){
+        console.error(err);
+        $loading.classList.add('d-none');
+        $error.textContent = err.message;
+        $error.classList.remove('d-none');
+      }
+    })();
+
+    function collectMetaAndStore(){
+      pendingMetaPayload = collectMeta();
+      if(txId && pendingMetaPayload){
+        sessionStorage.setItem(`txMeta:${txId}`, JSON.stringify(pendingMetaPayload));
+      }
+    }
+
+    async function confirmPayment(status){
+      if(!txId) return;
+      const isSuccessAttempt = status === 'success';
+      if(isSuccessAttempt && finishingCheckout) return;
+      if(isSuccessAttempt) finishingCheckout = true;
+      if(isSuccessAttempt){
+        const paymentCheck = validatePayment();
+        if(!paymentCheck.ok){
+          App.bootstrapToast(paymentCheck.message, 'warning');
+          finishingCheckout = false;
+          return;
+        }
+        const invoiceCheck = validateInvoice();
+        if(!invoiceCheck.ok){
+          App.bootstrapToast(invoiceCheck.message, 'warning');
+          finishingCheckout = false;
+          return;
+        }
+        collectMetaAndStore();
+      } else {
+        pendingMetaPayload = null;
+      }
+      try{
+        $loadingSpinner.classList.remove('d-none');
+        $statusText.textContent = status === 'success' ? '確認付款中…' : '取消交易中…';
+        const res = await fetch(`/api/payments/${txId}/confirm`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ status })
+        });
+        const data = await res.json();
+        if(!res.ok) throw new Error(data.error || '操作失敗');
+
+        if(status === 'success'){
+          App.bootstrapToast('付款成功，準備跳轉收據頁', 'success');
+          localStorage.removeItem(CART_KEY);
+          setTimeout(()=>location.href = `/result.html?tx=${encodeURIComponent(txId)}`, 400);
+        } else {
+          App.bootstrapToast('已取消本次交易，將返回商品頁', 'warning');
+          const backUrl = mem ? `/shop.html?mem=${encodeURIComponent(mem)}` : '/shop.html';
+          setTimeout(()=>location.href = backUrl, 400);
+        }
+      } catch(err){
+        console.error(err);
+        App.bootstrapToast(err.message, 'danger');
+        $statusText.textContent = '請重新操作';
+        if(isSuccessAttempt) finishingCheckout = false;
+      } finally {
+        $loadingSpinner.classList.add('d-none');
+        if(!isSuccessAttempt) finishingCheckout = false;
+      }
+    }
+
+    document.getElementById('payOk').addEventListener('click', ()=>confirmPayment('success'));
+    document.getElementById('payFail').addEventListener('click', ()=>{
+      if(txId && confirm('確認取消交易？')){
+        confirmPayment('fail');
+      }
+    });
+  </script>
+</body>
+</html>

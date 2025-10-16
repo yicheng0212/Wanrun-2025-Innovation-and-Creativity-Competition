@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>循環販賣機 Demo 入口</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body class="min-vh-100 d-flex flex-column">
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+    <div class="container">
+      <a class="navbar-brand fw-semibold" href="/index.html"><i class="bi bi-recycle me-2"></i>循環販賣機 DEMO</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="切換導覽">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="mainNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link active" aria-current="page" href="/index.html">體驗入口</a></li>
+          <li class="nav-item"><a class="nav-link" href="/scan.html">會員掃碼</a></li>
+          <li class="nav-item"><a class="nav-link" href="/shop.html">訪客購物</a></li>
+          <li class="nav-item"><a class="nav-link" href="/recycle.html">回收端</a></li>
+          <li class="nav-item"><a class="nav-link" href="/dashboard.html">ESG 儀表板</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <main class="flex-grow-1">
+    <section class="py-5 py-lg-6">
+      <div class="container">
+        <div class="row align-items-center g-4">
+          <div class="col-lg-6 animate-fade-up">
+            <div class="glass-card p-5">
+              <span class="badge bg-success-subtle text-success-emphasis hero-badge mb-3">循環永續 ‧ 智慧販賣</span>
+              <h1 class="fw-bold display-5 text-primary mb-3">打造零廢循環的販賣機旗艦體驗</h1>
+              <p class="lead text-secondary">從會員掃碼、智慧結帳、模擬出貨到 ESG 數據化，完整呈現循環容器販賣機的極致旅程，專為第一名而生。</p>
+              <div class="d-flex flex-wrap gap-3 mt-4">
+                <a class="btn btn-lg btn-soft px-4" href="/scan.html"><i class="bi bi-upc-scan me-2"></i>立即開始體驗</a>
+                <a class="btn btn-lg btn-soft outline px-4" href="/shop.html"><i class="bi bi-basket2 me-2"></i>訪客模式購物</a>
+                <a class="btn btn-lg btn-soft outline px-4" href="/recycle.html"><i class="bi bi-recycle me-2"></i>回收端操作</a>
+              </div>
+              <div class="d-flex align-items-center gap-2 mt-4 text-muted">
+                <i class="bi bi-info-circle"></i>
+                <small>想直接看成果？<a class="link-primary text-decoration-none ms-1" href="/dashboard.html">前往 ESG 儀表板</a></small>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-6 animate-fade-up animate-fade-delay">
+            <div class="glass-card p-4">
+              <div class="row g-3">
+                <div class="col-sm-6">
+                  <div class="card border-0 card-lift h-100 bg-primary-subtle">
+                    <div class="card-body">
+                      <h3 class="h5 text-primary"><i class="bi bi-person-bounding-box me-2"></i>會員掃碼</h3>
+                      <p class="small text-secondary mb-0">支援 QR / 手動輸入，一秒啟動專屬權益。</p>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-sm-6">
+                  <div class="card border-0 card-lift h-100 bg-success-subtle">
+                    <div class="card-body">
+                      <h3 class="h5 text-success"><i class="bi bi-shop-window me-2"></i>沉浸購物</h3>
+                      <p class="small text-secondary mb-0">動態 ESG 指標、料道資訊一覽無遺。</p>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-sm-6">
+                  <div class="card border-0 card-lift h-100 bg-warning-subtle">
+                    <div class="card-body">
+                      <h3 class="h5 text-warning"><i class="bi bi-cash-coin me-2"></i>智慧結帳</h3>
+                      <p class="small text-secondary mb-0">即時計算押金、減碳、節水，模擬支付超流暢。</p>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-sm-6">
+                  <div class="card border-0 card-lift h-100 bg-info-subtle">
+                    <div class="card-body">
+                      <h3 class="h5 text-info"><i class="bi bi-gear-wide-connected me-2"></i>出貨模擬</h3>
+                      <p class="small text-secondary mb-0">三段出貨、卡貨回退、退款即時紀錄，面面俱到。</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="py-5 bg-light">
+      <div class="container">
+        <div class="text-center mb-5">
+          <span class="badge bg-primary-subtle text-primary-emphasis badge-soft">核心亮點</span>
+          <h2 class="section-title display-6 mt-3">三大模組，打通線上到線下的循環體驗</h2>
+          <p class="text-secondary">透過整合式前後端架構，將永續數據、智慧販售與使用者體驗緊密串聯。</p>
+        </div>
+      <div class="row g-4 row-cols-1 row-cols-lg-2 row-cols-xl-4">
+        <div class="col">
+          <div class="card border-0 glass-card card-lift h-100 p-4">
+            <div class="d-flex align-items-center gap-3 mb-3">
+              <div class="badge bg-primary text-white rounded-circle p-3"><i class="bi bi-cpu"></i></div>
+              <h3 class="h5 mb-0">智慧後端引擎</h3>
+            </div>
+            <p class="text-secondary">以 `Express + SQLite` 迅速建構交易、出貨、退款與 ESG 資料模型，確保 Demo 階段即具備實戰穩定度。</p>
+            <ul class="text-secondary small list-unstyled mb-0">
+              <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>即時交易建檔與押金拆帳</li>
+              <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>三段出貨模擬 + 自動補扣庫存</li>
+              <li><i class="bi bi-check-circle-fill text-success me-2"></i>ESG 指標統計 API 隨時讀取</li>
+            </ul>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card border-0 glass-card card-lift h-100 p-4">
+            <div class="d-flex align-items-center gap-3 mb-3">
+              <div class="badge bg-success text-white rounded-circle p-3"><i class="bi bi-joystick"></i></div>
+              <h3 class="h5 mb-0">零摩擦前端體驗</h3>
+            </div>
+            <p class="text-secondary">Bootstrap 5 + 自訂動畫打造玻璃擬物介面，流程導向的操作提示與 Toast 回饋讓評審直覺上手。</p>
+            <ul class="text-secondary small list-unstyled mb-0">
+              <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>自動完成、快速鍵與動態步驟提示</li>
+              <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>購物車 Offcanvas + ESG 即時計算</li>
+              <li><i class="bi bi-check-circle-fill text-success me-2"></i>情境化收據與出貨時間軸</li>
+            </ul>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card border-0 glass-card card-lift h-100 p-4">
+            <div class="d-flex align-items-center gap-3 mb-3">
+              <div class="badge bg-info text-white rounded-circle p-3"><i class="bi bi-bar-chart"></i></div>
+              <h3 class="h5 mb-0">永續洞察再進化</h3>
+            </div>
+            <p class="text-secondary">多圖層儀表板與高互動數據視覺，呈現每日、累積、趨勢等指標，立即秀出比賽級亮點。</p>
+            <ul class="text-secondary small list-unstyled mb-0">
+              <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>雙 Y 軸營收/減碳趨勢圖</li>
+              <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>卡片型 KPI 與同步動畫計數</li>
+              <li><i class="bi bi-check-circle-fill text-success me-2"></i>可擴充的 API 介面與快取策略</li>
+            </ul>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card border-0 glass-card card-lift h-100 p-4">
+            <div class="d-flex align-items-center gap-3 mb-3">
+              <div class="badge bg-warning text-white rounded-circle p-3"><i class="bi bi-recycle"></i></div>
+              <h3 class="h5 mb-0">閉環回收流程</h3>
+            </div>
+            <p class="text-secondary">回收端模組支援條碼 / 收據辨識、退押金與 ESG 回饋，展示完整循環經濟閉環。</p>
+            <ul class="text-secondary small list-unstyled mb-0">
+              <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>預檢提醒濫用、日上限控管</li>
+              <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>接受 / 拒收即時回寫押金與紀錄</li>
+              <li><i class="bi bi-check-circle-fill text-success me-2"></i>資料與 ESG 儀表板整合、即時加分</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      </div>
+    </section>
+
+    <section class="py-5">
+      <div class="container">
+        <div class="row g-4 align-items-center">
+          <div class="col-lg-6 animate-fade-up">
+            <div class="glass-card p-4">
+              <div class="d-flex align-items-center gap-3 mb-4">
+                <div class="badge bg-warning text-dark rounded-circle p-3"><i class="bi bi-trophy-fill"></i></div>
+                <div>
+                  <h2 class="h3 mb-0">賽事級完整流程，評審無須想像</h2>
+                  <small class="text-secondary">一頁式導覽 + 出貨模擬 + ESG 佐證報表</small>
+                </div>
+              </div>
+              <ul class="list-unstyled text-secondary small list-group list-group-flush list-group-animated">
+                <li class="list-group-item bg-transparent px-0 d-flex align-items-center gap-3">
+                  <span class="progress-step active"></span>
+                  <div><b>Step 1</b> 會員掃碼：即時驗證並讀取押金/點數</div>
+                </li>
+                <li class="list-group-item bg-transparent px-0 d-flex align-items-center gap-3">
+                  <span class="progress-step active"></span>
+                  <div><b>Step 2</b> 購物選品：分類、搜尋、ESG 標籤一應俱全</div>
+                </li>
+                <li class="list-group-item bg-transparent px-0 d-flex align-items-center gap-3">
+                  <span class="progress-step active"></span>
+                  <div><b>Step 3</b> 支付結帳：押金拆帳、永續成效逐筆可追</div>
+                </li>
+                <li class="list-group-item bg-transparent px-0 d-flex align-items-center gap-3">
+                  <span class="progress-step active"></span>
+                  <div><b>Step 4</b> 出貨模擬：成功/卡貨/缺貨即時紀錄 + 退款</div>
+                </li>
+                <li class="list-group-item bg-transparent px-0 d-flex align-items-center gap-3">
+                  <span class="progress-step active"></span>
+                  <div><b>Step 5</b> ESG 報表：日/總數據、折線與 KPI 卡一次看懂</div>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div class="col-lg-6 animate-fade-up animate-fade-delay">
+            <div class="glass-card p-5 text-center">
+              <p class="text-secondary mb-4">三分鐘快速上手，立刻看見永續成果。</p>
+              <div class="d-flex flex-wrap justify-content-center gap-3">
+                <a class="btn btn-primary btn-lg btn-soft px-4" href="/scan.html"><i class="bi bi-lightning-charge me-2"></i>立即展演</a>
+                <a class="btn btn-outline-secondary btn-lg btn-soft px-4" href="/dashboard.html"><i class="bi bi-bar-chart-line me-2"></i>看趨勢報表</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="py-4 text-white text-center mt-auto bg-primary">
+    <small>© 2025 循環販賣機 Demo — Wanrun Innovation & Creativity Competition</small>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/assets/app.js"></script>
+</body>
+</html>

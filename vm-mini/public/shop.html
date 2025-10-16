@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>商品選購｜循環販賣機</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body class="min-vh-100 d-flex flex-column page-shop">
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+    <div class="container">
+      <a class="navbar-brand fw-semibold" href="/index.html"><i class="bi bi-recycle me-2"></i>循環販賣機 DEMO</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="切換導覽">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="mainNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link" href="/index.html">體驗入口</a></li>
+          <li class="nav-item"><a class="nav-link" href="/scan.html">會員掃碼</a></li>
+          <li class="nav-item"><a class="nav-link active" aria-current="page" href="/shop.html">訪客購物</a></li>
+          <li class="nav-item"><a class="nav-link" href="/recycle.html">回收端</a></li>
+          <li class="nav-item"><a class="nav-link" href="/dashboard.html">ESG 儀表板</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <main class="vm-stage">
+    <div class="container">
+      <div class="vm-shell">
+        <div class="vm-top-bar">
+          <div class="vm-logo"><i class="bi bi-box-seam"></i>VM-01X</div>
+          <div class="d-flex align-items-center gap-3">
+            <div class="vm-pill-display"><span class="vm-led-dot"></span><span id="vmStatusText">貨槽維持最佳狀態</span></div>
+            <div class="vm-pill-display"><i class="bi bi-clock me-2"></i><span id="vmClock">--:--</span></div>
+          </div>
+        </div>
+        <div class="vm-body">
+          <section class="vm-screen">
+            <div class="vm-screen-body">
+              <div class="glass-card p-4 p-lg-5 mb-4">
+                <div class="d-flex flex-column flex-lg-row align-items-center justify-content-between gap-3">
+                  <div>
+                    <span class="badge bg-success-subtle text-success-emphasis mb-2">Step 2</span>
+                    <h1 class="fw-bold text-white mb-2">挑選循環飲品，累積 ESG 成效</h1>
+                    <p class="text-secondary mb-3">系統即時計算庫存及 ESG 指標，帶來如同 Premium Vending Machine 的互動體驗。</p>
+                    <div id="memInfo"></div>
+                  </div>
+                  <div class="text-end">
+                    <button class="btn btn-soft outline" id="refreshSkuBtn"><i class="bi bi-arrow-clockwise me-2"></i>更新庫存</button>
+                  </div>
+                </div>
+                <hr class="my-4">
+                <div class="row g-3 align-items-end">
+                  <div class="col-lg-4">
+                    <label class="form-label text-secondary small mb-1" for="searchInput">搜尋商品 / 類別</label>
+                    <div class="input-group input-group-lg">
+                      <span class="input-group-text"><i class="bi bi-search"></i></span>
+                      <input id="searchInput" class="form-control" placeholder="輸入商品名稱或關鍵字">
+                    </div>
+                  </div>
+                  <div class="col-lg-8">
+                    <div class="d-flex flex-wrap gap-2 justify-content-lg-end" id="categoryFilters"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div id="inventoryMeta" class="text-secondary small mb-3"></div>
+              <div id="list" class="vm-shelf"></div>
+              <div class="vm-pickup-slot mt-4">
+                <div><i class="bi bi-box-arrow-down me-2"></i>取貨口閃爍中，完成結帳後自動開啟</div>
+                <span class="badge text-bg-light">SAFE LOCK</span>
+              </div>
+            </div>
+          </section>
+          <aside class="vm-side-panel d-flex align-items-center justify-content-center">
+            <div class="info-chip info-large" title="循環飲品資訊">i</div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <button id="checkoutBtn" class="btn btn-primary btn-lg floating-action" type="button" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">
+    <i class="bi bi-bag-check me-2"></i>
+    <span>購物車 (0)</span>
+  </button>
+
+  <div class="offcanvas offcanvas-end" tabindex="-1" id="cartOffcanvas">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title"><i class="bi bi-bag-heart me-2 text-primary"></i>購物車明細</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body d-flex flex-column gap-3">
+      <div id="cartList" class="list-group list-group-flush list-group-animated flex-grow-1 overflow-auto"></div>
+      <div id="cartSummary" class="glass-card p-4"></div>
+      <div class="d-flex gap-3">
+        <button id="clearCart" class="btn btn-outline-secondary flex-grow-1"><i class="bi bi-trash3 me-2"></i>清空購物車</button>
+        <a id="toCheckout" class="btn btn-primary flex-grow-1"><i class="bi bi-arrow-right-circle me-2"></i>前往結帳</a>
+      </div>
+    </div>
+  </div>
+
+  <footer class="py-4 text-white text-center bg-primary mt-auto">
+    <small>© 2025 循環販賣機 Demo</small>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/assets/app.js"></script>
+  <script>
+    const url = new URL(location.href);
+    const mem = url.searchParams.get('mem') || '';
+    const CART_KEY = 'cart:' + (mem || 'guest');
+    let cart = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
+    let skuList = [];
+    let skuMap = new Map();
+    const state = { category: 'all', search: '' };
+
+    const $list = document.getElementById('list');
+    const $checkoutBtn = document.getElementById('checkoutBtn');
+    const $checkoutBtnLabel = $checkoutBtn.querySelector('span');
+    const $cartList = document.getElementById('cartList');
+    const $cartSummary = document.getElementById('cartSummary');
+    const cartOffcanvasEl = document.getElementById('cartOffcanvas');
+    const $searchInput = document.getElementById('searchInput');
+    const $categoryFilters = document.getElementById('categoryFilters');
+    const $inventoryMeta = document.getElementById('inventoryMeta');
+    const $toCheckout = document.getElementById('toCheckout');
+    const $refreshSkuBtn = document.getElementById('refreshSkuBtn');
+    const filterKeypad = document.getElementById('filterKeypad');
+    const statEls = {
+      balance: null,
+      items: null,
+      deposit: null,
+      carbon: null,
+      water: null
+    };
+    // 依商品類別配置漸層色塊，呼應機台櫥窗
+    const gradientMap = {
+      '茶飲': 'linear-gradient(135deg, #facc15, #f97316)',
+      '氣泡水': 'linear-gradient(135deg, #22d3ee, #3b82f6)',
+      '氣泡飲': 'linear-gradient(135deg, #22d3ee, #3b82f6)',
+      '咖啡': 'linear-gradient(135deg, #f97316, #9f1239)',
+      '特調': 'linear-gradient(135deg, #ec4899, #6366f1)',
+      '植物奶': 'linear-gradient(135deg, #22c55e, #a3e635)',
+      '能量飲': 'linear-gradient(135deg, #f59e0b, #ef4444)',
+      '功能飲': 'linear-gradient(135deg, #38bdf8, #10b981)'
+    };
+
+    function heroGradient(category){
+      return gradientMap[category] || 'linear-gradient(135deg, #60a5fa, #c084fc)';
+    }
+
+    const iconMap = {
+      '茶飲': 'bi-cup-hot',
+      '咖啡': 'bi-cup-hot',
+      '氣泡水': 'bi-cup-straw',
+      '氣泡飲': 'bi-cup-straw',
+      '特調': 'bi-cup-straw',
+      '植物奶': 'bi-emoji-smile',
+      '能量飲': 'bi-lightning',
+      '功能飲': 'bi-droplet-half',
+      '果汁': 'bi-cup-straw'
+    };
+
+    let memberInfo = null;
+
+    async function loadSkuList(){
+      const res = await fetch('/api/sku');
+      skuList = await res.json();
+      skuList.sort((a,b)=>(Number(a.lane_no||0) - Number(b.lane_no||0)));
+      skuMap = new Map(skuList.map(item => [item.id, item]));
+      renderFilters();
+      renderSkuList();
+    }
+
+    function persistCart(){
+      localStorage.setItem(CART_KEY, JSON.stringify(cart));
+    }
+
+    function uniqueCategories(){
+      const set = new Set();
+      skuList.forEach(item=>{
+        if(item.category) set.add(item.category);
+      });
+      return Array.from(set);
+    }
+
+    function filterItems(){
+      const keyword = state.search.trim().toLowerCase();
+      return skuList.filter(item=>{
+        const matchCat = state.category === 'all' || item.category === state.category;
+        const keywordMatch = !keyword || [item.name, item.category, item.id].some(v => (v || '').toLowerCase().includes(keyword));
+        return matchCat && keywordMatch;
+      });
+    }
+
+    function formatLane(no){
+      const lane = Number(no);
+      if(Number.isNaN(lane) || lane <= 0) return '--';
+      const index = lane - 1;
+      const row = Math.floor(index / 10);
+      const col = index % 10;
+      const letter = String.fromCharCode(65 + row);
+      return `${letter}${String(col + 1).padStart(2, '0')}`;
+    }
+    // 產生玻璃質感的分類籤，支援即時切換
+    function renderFilters(){
+      const cats = uniqueCategories();
+      const buttons = [
+        `<button type="button" class="filter-chip ${state.category==='all'?'active':''}" data-category="all"><i class="bi bi-grid me-1"></i>全部品項</button>`,
+        ...cats.map(cat=>`<button type="button" class="filter-chip ${state.category===cat?'active':''}" data-category="${cat}"><i class="bi bi-tag me-1"></i>${cat}</button>`)
+      ];
+      $categoryFilters.innerHTML = buttons.join('');
+      $categoryFilters.querySelectorAll('button').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          state.category = btn.dataset.category;
+          renderFilters();
+          renderSkuList();
+        });
+      });
+    }
+    // 繪製商品卡片：套用漸層 Hero、ESG 指標與加入購物袋按鈕
+    function renderSkuList(){
+      const items = filterItems();
+      const totalStock = skuList.reduce((sum,it)=>sum+Number(it.stock||0),0);
+      const scopeLabel = state.category === 'all' ? '全部品項' : `「${state.category}」精選`;
+      $inventoryMeta.innerHTML = `<div class="glass-ring inventory-note small"><i class="bi bi-upc-scan me-2"></i>展示 ${items.length} / ${skuList.length} 款飲品（${scopeLabel}），庫存總量 ${totalStock} 件。掃描條碼或輸入料道即可加入購物袋。</div>`;
+
+      if(items.length === 0){
+        $list.innerHTML = `
+          <div class="glass-card p-5 text-center text-secondary">
+            <i class="bi bi-emoji-frown fs-1 d-block mb-3"></i>
+            <p class="mb-0">找不到符合條件的商品，請調整搜尋或分類。</p>
+          </div>`;
+        return;
+      }
+
+      $list.innerHTML = items.map(item=>{
+        const icon = iconMap[item.category] || 'bi-cup-straw';
+        const laneLabel = formatLane(item.lane_no);
+        const depositBadge = item.deposit_cents>0
+          ? '<span class="badge text-bg-warning rounded-pill">含押金</span>'
+          : '<span class="badge bg-light text-secondary rounded-pill">無押金</span>';
+        const depositText = item.deposit_cents>0
+          ? `押金 $${(item.deposit_cents/100).toFixed(0)}，回收可退還`
+          : '免押金';
+        return `
+          <article class="vm-shelf-item card-lift">
+            <div class="vm-shelf-thumb" style="background:${heroGradient(item.category)}">
+              <div class="lane-chip">${laneLabel}</div>
+              <div class="vm-scan-badge"><i class="bi bi-upc-scan me-1"></i>SCAN</div>
+              <i class="bi ${icon} fs-1"></i>
+            </div>
+            <div class="vm-shelf-body">
+              <h3 class="mb-1">${item.name}</h3>
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="text-secondary small">庫存 ${item.stock} ｜ ${item.category || '循環飲品'}</span>
+                ${depositBadge}
+              </div>
+              <div class="d-flex justify-content-between align-items-end mb-3">
+                <div>
+                  <div class="fs-4 fw-bold text-primary">$${(item.price_cents/100).toFixed(0)}</div>
+                  <small class="text-secondary">${depositText}</small>
+                </div>
+                <div class="text-secondary text-end small">
+                  <div><i class="bi bi-cloud-sun me-1"></i>減碳 ${Number(item.carbon_saving || 0).toFixed(3)} kg</div>
+                  <div><i class="bi bi-droplet me-1"></i>節水 ${Number(item.water_saving || 0).toFixed(1)} L</div>
+                </div>
+              </div>
+            </div>
+            <div class="vm-shelf-footer">
+              <button class="btn btn-soft icon-only" data-action="add" data-sku="${item.id}" title="加入購物袋" aria-label="加入購物袋">
+                <i class="bi bi-bag-plus-fill"></i>
+              </button>
+            </div>
+          </article>
+        `;
+      }).join('');
+
+      $list.querySelectorAll('[data-action="add"]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          addToCart(btn.dataset.sku);
+        });
+      });
+    }
+
+    function calculateCartMetrics(){
+      let itemCount = 0;
+      let totalCents = 0;
+      let depositCents = 0;
+      let carbon = 0;
+      let water = 0;
+
+      cart.forEach(entry=>{
+        const sku = skuMap.get(entry.sku_id);
+        if(!sku) return;
+        const qty = Number(entry.qty || 0);
+        itemCount += qty;
+        totalCents += (sku.price_cents + sku.deposit_cents) * qty;
+        depositCents += sku.deposit_cents * qty;
+        carbon += (sku.carbon_saving || 0) * qty;
+        water += (sku.water_saving || 0) * qty;
+      });
+
+      return { itemCount, totalCents, depositCents, carbon, water };
+    }
+    // 動態呈現購物車明細，並同步更新指標與按鈕狀態
+    function renderCart(){
+      const { itemCount, totalCents, depositCents, carbon, water } = calculateCartMetrics();
+
+      if(cart.length === 0){
+        $cartList.innerHTML = `<div class="text-center text-secondary py-5"><i class="bi bi-bag-dash fs-1 d-block mb-3"></i>購物車是空的，挑幾款循環飲品試試吧！</div>`;
+      } else {
+        $cartList.innerHTML = cart.map(entry=>{
+          const sku = skuMap.get(entry.sku_id);
+          if(!sku) return '';
+          const qty = Number(entry.qty || 0);
+          return `
+            <div class="list-group-item d-flex align-items-center justify-content-between">
+              <div>
+                <strong>${sku.name}</strong>
+                <div class="text-secondary small">單價 $${(sku.price_cents/100).toFixed(0)}${sku.deposit_cents>0?' ＋押金':''}</div>
+              </div>
+              <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-outline-secondary btn-sm" data-action="qty" data-id="${sku.id}" data-delta="-1"><i class="bi bi-dash"></i></button>
+                <span class="fw-semibold">${qty}</span>
+                <button class="btn btn-outline-secondary btn-sm" data-action="qty" data-id="${sku.id}" data-delta="1"><i class="bi bi-plus"></i></button>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        $cartList.querySelectorAll('[data-action="qty"]').forEach(btn=>{
+          btn.addEventListener('click', ()=>{
+            changeQuantity(btn.dataset.id, Number(btn.dataset.delta));
+          });
+        });
+      }
+
+      $cartSummary.innerHTML = `
+        <div class="d-flex justify-content-between mb-2">
+          <span class="text-secondary">商品件數</span>
+          <span class="fw-semibold">${itemCount}</span>
+        </div>
+        <div class="d-flex justify-content-between mb-2">
+          <span class="text-secondary">押金合計</span>
+          <span class="fw-semibold">$${(depositCents/100).toFixed(0)}</span>
+        </div>
+        <div class="d-flex justify-content-between mb-2">
+          <span class="text-secondary">總額 (含押金)</span>
+          <span class="fs-4 fw-bold text-primary">$${(totalCents/100).toFixed(0)}</span>
+        </div>
+        <div class="bg-success-subtle text-success-emphasis rounded-4 p-3">
+          <div class="fw-semibold">本次 ESG 貢獻</div>
+          <small>減碳 ${carbon.toFixed(3)} kg CO₂e ／ 節水 ${water.toFixed(1)} L</small>
+        </div>
+      `;
+
+      const checkoutHref = mem ? `/checkout.html?mem=${encodeURIComponent(mem)}` : '/checkout.html';
+      $toCheckout.href = checkoutHref;
+      $toCheckout.classList.toggle('disabled', itemCount === 0);
+      $checkoutBtnLabel.textContent = `購物車 (${itemCount})`;
+      $checkoutBtn.disabled = itemCount === 0;
+
+      if(statEls.items && statEls.deposit){
+        if(window.App && App.animateCounter){
+          App.animateCounter(statEls.items, itemCount);
+          App.animateCounter(statEls.deposit, Math.round(depositCents/100));
+        } else {
+          statEls.items.textContent = itemCount;
+          statEls.deposit.textContent = (depositCents/100).toFixed(0);
+        }
+      }
+      if(statEls.carbon){
+        statEls.carbon.textContent = carbon.toFixed(3);
+      }
+      if(statEls.water){
+        statEls.water.textContent = water.toFixed(1);
+      }
+    }
+
+    function addToCart(skuId){
+      const existing = cart.find(item => item.sku_id === skuId);
+      if(existing){
+        existing.qty = Number(existing.qty || 0) + 1;
+      } else {
+        cart.push({ sku_id: skuId, qty: 1 });
+      }
+      persistCart();
+      renderCart();
+      const sku = skuMap.get(skuId);
+      App.bootstrapToast(`${sku?.name || '商品'} 已加入購物車`, 'success');
+    }
+
+    function changeQuantity(skuId, delta){
+      const entry = cart.find(item => item.sku_id === skuId);
+      if(!entry) return;
+      entry.qty = Number(entry.qty || 0) + delta;
+      if(entry.qty <= 0){
+        cart = cart.filter(item => item !== entry);
+      }
+      persistCart();
+      renderCart();
+    }
+
+    document.getElementById('clearCart').addEventListener('click', ()=>{
+      cart = [];
+      persistCart();
+      renderCart();
+      App.bootstrapToast('購物車已清空', 'warning');
+    });
+
+    // 前往結帳時自動收起 offcanvas，避免遮擋畫面
+    const toCheckoutBtn = document.getElementById('toCheckout');
+    const offcanvasInstance = (window.bootstrap && cartOffcanvasEl)
+      ? bootstrap.Offcanvas.getOrCreateInstance(cartOffcanvasEl)
+      : null;
+
+    toCheckoutBtn.addEventListener('click', ()=>{
+      if(offcanvasInstance){
+        offcanvasInstance.hide();
+      }
+    });
+
+    if(offcanvasInstance){
+      cartOffcanvasEl.addEventListener('show.bs.offcanvas', ()=>{
+        $checkoutBtn.classList.add('d-none');
+      });
+      cartOffcanvasEl.addEventListener('hidden.bs.offcanvas', ()=>{
+        $checkoutBtn.classList.remove('d-none');
+      });
+    }
+
+    $searchInput.addEventListener('input', ()=>{
+      state.search = $searchInput.value;
+      renderSkuList();
+    });
+
+    (async()=>{
+      if(mem){
+        document.getElementById('memInfo').innerHTML = `
+          <div class="glass-ring mem-summary">
+            <i class="bi bi-person-badge-fill"></i>
+            <span>會員卡 ${mem}</span>
+          </div>`;
+      } else {
+        document.getElementById('memInfo').innerHTML = `
+          <div class="glass-ring mem-summary muted">
+            <i class="bi bi-incognito"></i>
+            <span>訪客模式</span>
+          </div>`;
+      }
+
+      await loadSkuList();
+      renderCart();
+    })();
+
+    if($refreshSkuBtn){
+      $refreshSkuBtn.addEventListener('click', async ()=>{
+        App.bootstrapToast('更新商品與庫存...', 'info');
+        await loadSkuList();
+        renderCart();
+      });
+    }
+
+    if(filterKeypad){
+      filterKeypad.querySelectorAll('button[data-filter]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const key = btn.dataset.filter;
+          if(key === 'clear'){
+            $searchInput.value = '';
+            state.category = 'all';
+          } else if(key === 'all'){
+            state.category = 'all';
+          } else {
+            state.category = key;
+          }
+          renderFilters();
+          renderSkuList();
+        });
+      });
+    }
+  </script>
+</body>
+</html>
