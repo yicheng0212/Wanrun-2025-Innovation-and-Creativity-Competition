@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS sku (
   status TEXT DEFAULT 'active',
   carbon_saving REAL DEFAULT 0,       -- 每瓶減碳 (kg CO₂e)
   water_saving REAL DEFAULT 0,        -- 每瓶節水 (L)
+  image_url TEXT,                     -- 商品示意圖路徑（相對或絕對 URL）
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );

@@ -42,14 +42,15 @@
               <div id="statusBadge" class="badge text-bg-secondary fs-6"></div>
             </div>
             <div id="rec"></div>
-            <div id="dispenseSection" class="mt-4 d-none">
-              <div class="glass-card p-4">
-                <h2 class="h5 text-secondary mb-3"><i class="bi bi-gear-wide-connected me-2"></i>出貨紀錄</h2>
-                <div id="dispenseLogs" class="list-group list-group-flush list-group-animated"></div>
+            <div id="redirectNotice" class="alert alert-info d-none align-items-center gap-3 mt-4" role="status">
+              <span class="spinner-border text-primary" role="status" aria-hidden="true"></span>
+              <div>
+                <div class="fw-semibold mb-1">感謝購物！</div>
+                <small>正在準備感謝頁面，稍候自動為您導向。</small>
               </div>
             </div>
             <div class="mt-4 d-flex flex-wrap gap-3">
-              <a id="toDispense" class="btn btn-primary btn-lg px-4" style="display:none"><i class="bi bi-gear me-2"></i><span>前往出貨模擬</span></a>
+              <a id="toThankYou" class="btn btn-primary btn-lg px-4"><i class="bi bi-hearts me-2"></i>前往感謝頁</a>
               <a class="btn btn-outline-primary btn-lg px-4" href="/dashboard.html"><i class="bi bi-bar-chart-line me-2"></i>看 ESG 儀表板</a>
               <a id="continueShopping" class="btn btn-light btn-lg px-4" href="/shop.html"><i class="bi bi-arrow-left-circle me-2"></i>繼續購物</a>
             </div>
@@ -69,12 +70,13 @@
     const url = new URL(location.href);
     const txParam = url.searchParams.get('tx');
     const $rec = document.getElementById('rec');
-    const $toDispense = document.getElementById('toDispense');
+    const $toThankYou = document.getElementById('toThankYou');
     const $statusBadge = document.getElementById('statusBadge');
     const $continueShopping = document.getElementById('continueShopping');
-    const $dispenseSection = document.getElementById('dispenseSection');
-    const $dispenseLogs = document.getElementById('dispenseLogs');
+    const $redirectNotice = document.getElementById('redirectNotice');
     const metaStorageKey = `txMeta:${txParam}`;
+    const THANK_YOU_DELAY = 2000;
+    let redirectTimer = null;
     let txMeta = null;
     try {
       const raw = sessionStorage.getItem(metaStorageKey);
@@ -87,7 +89,7 @@
     function presentStatus(status){
       switch(status){
         case 'created': return { text:'待付款', color:'text-bg-warning' };
-        case 'paid': return { text:'待出貨', color:'text-bg-success' };
+        case 'paid': return { text:'處理中', color:'text-bg-success' };
         case 'dispensing': return { text:'出貨中', color:'text-bg-info' };
         case 'done': return { text:'已完成', color:'text-bg-primary' };
         case 'canceled': return { text:'已取消', color:'text-bg-secondary' };
@@ -169,12 +171,13 @@
       }
 
       const { tx: t, items, user } = data;
-      const skuNameMap = new Map(items.map(i=>[i.sku_id, i.sku_name]));
       const statusView = presentStatus(t.status);
       $statusBadge.textContent = statusView.text;
       $statusBadge.className = `badge fs-6 ${statusView.color}`;
       const paymentMetaHtml = renderPaymentMeta(txMeta);
 
+      const rewardTotal = (t.deposit_total_cents/100).toFixed(0);
+      const totalAmount = (t.total_cents/100).toFixed(0);
       $rec.innerHTML = `
         <div class="bg-light rounded-4 p-4 mb-4">
           <div class="d-flex flex-wrap gap-3 align-items-center">
@@ -206,7 +209,7 @@
                   <div class="d-flex justify-content-between align-items-center">
                     <div>
                       <div class="fw-semibold">${i.sku_name}</div>
-                      <small class="text-secondary">數量 ${i.qty} ｜ 單價 $${(i.unit_price_cents/100).toFixed(0)}${i.deposit_cents>0?' ＋押金':''}</small>
+                      <small class="text-secondary">數量 ${i.qty} ｜ 單價 $${(i.unit_price_cents/100).toFixed(0)} ｜ 回饋 $${(i.deposit_cents/100).toFixed(0)}</small>
                     </div>
                     <div class="fw-semibold text-primary">$${( (i.unit_price_cents + i.deposit_cents) * i.qty / 100).toFixed(0)}</div>
                   </div>
@@ -216,12 +219,12 @@
           </div>
           <div class="card-footer bg-light">
             <div class="d-flex justify-content-between align-items-center mb-2">
-              <span class="text-secondary">押金合計</span>
-              <span class="fw-semibold">$${(t.deposit_total_cents/100).toFixed(0)}</span>
+              <span class="text-secondary">回收回饋</span>
+              <span class="fw-semibold">$${rewardTotal}</span>
             </div>
             <div class="d-flex justify-content-between align-items-center">
-              <span class="fw-semibold">商品＋押金總計</span>
-              <span class="display-6 fw-bold text-primary">$${(t.total_cents/100).toFixed(0)}</span>
+              <span class="fw-semibold">結帳金額 (含回饋預付)</span>
+              <span class="display-6 fw-bold text-primary">$${totalAmount}</span>
             </div>
           </div>
         </div>
@@ -232,51 +235,30 @@
             <div>減碳 ${(+t.carbon_saving).toFixed(3)} kg CO₂e、節水 ${(+t.water_saving).toFixed(1)} L</div>
           </div>
         </div>
-        <div class="alert alert-secondary mb-0">
-          <i class="bi bi-gear-wide-connected me-2"></i>下一步可前往出貨頁模擬「成功／卡貨／缺貨」，系統將依結果記錄退款與押金流。
-          ${t.tx_refund_cents ? `<div class="mt-2 text-secondary small"><i class="bi bi-cash-coin me-1"></i>退款金額：$${(t.tx_refund_cents/100).toFixed(0)}</div>` : ''}
+        <div class="alert alert-info mb-0">
+          <i class="bi bi-heart-pulse me-2"></i>稍後將導向感謝頁面，祝您享受這次循環購物體驗！
         </div>
         ${paymentMetaHtml}
       `;
-
-      // 調整出貨按鈕顯示邏輯
-      if (['paid','dispensing','done'].includes(t.status)) {
-        $toDispense.href = `/dispense.html?tx=${encodeURIComponent(txParam)}`;
-        if (t.status === 'done') {
-          $toDispense.querySelector('span').textContent = '查看出貨日誌';
-        }
-        $toDispense.style.display = 'inline-flex';
-      }
 
       if (user) {
         $continueShopping.href = `/shop.html?mem=${encodeURIComponent(user.mem_no)}`;
       }
 
-      // 若交易已進入出貨階段，額外載入日誌呈現
-      if (['dispensing','done'].includes(t.status)) {
-        try{
-          const logRes = await fetch(`/api/dispense/${txParam}`);
-          const logData = await logRes.json();
-          if(logRes.ok && Array.isArray(logData.logs) && logData.logs.length){
-            const logs = logData.logs;
-            $dispenseLogs.innerHTML = logs.map(log=>{
-              const label = skuNameMap.get(log.sku_id) || log.sku_id;
-              const badgeClass = log.result==='success' ? 'text-bg-success' : (log.result==='jam' ? 'text-bg-warning' : 'text-bg-danger');
-              return `
-              <div class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
-                <div>
-                  <div class="fw-semibold">${label}</div>
-                  <small class="text-secondary">料道 ${log.lane_no ?? '-'} ｜ 嘗試 ${log.attempt_no}</small>
-                </div>
-                <span class="badge ${badgeClass}">${log.result}</span>
-              </div>`;
-            }).join('');
-            $dispenseSection.classList.remove('d-none');
-          }
-        } catch(err){
-          console.error(err);
-        }
+      const thankYouUrl = `/thanks.html?tx=${encodeURIComponent(txParam)}`;
+      $toThankYou.href = thankYouUrl;
+      $redirectNotice.classList.remove('d-none');
+      if(redirectTimer){
+        clearTimeout(redirectTimer);
       }
+      redirectTimer = setTimeout(()=>location.href = thankYouUrl, THANK_YOU_DELAY);
+      $toThankYou.addEventListener('click', ()=>{
+        if(redirectTimer){
+          clearTimeout(redirectTimer);
+        }
+        location.href = thankYouUrl;
+      }, { once: true });
+
       if(txMeta){
         sessionStorage.removeItem(metaStorageKey);
       }

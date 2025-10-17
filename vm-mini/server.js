@@ -18,15 +18,49 @@ try {
   /* avoid duplicate */
 }
 
+const MIN_REWARD_CENTS = 500;
+const MAX_REWARD_CENTS = 1500;
+
+function fetchCarbonBounds(){
+  const row = db.prepare(`
+    SELECT MIN(carbon_saving) AS min_carbon, MAX(carbon_saving) AS max_carbon
+    FROM sku WHERE status='active'
+  `).get();
+  return {
+    min: row?.min_carbon ?? 0,
+    max: row?.max_carbon ?? 0
+  };
+}
+
+function computeIncentiveCents(carbonSaving, bounds){
+  const carbon = Number(carbonSaving) || 0;
+  const min = bounds?.min ?? 0;
+  const max = bounds?.max ?? min;
+  if (max <= min) return MIN_REWARD_CENTS;
+  const normalized = Math.min(1, Math.max(0, (carbon - min) / (max - min)));
+  const reward = MIN_REWARD_CENTS + (MAX_REWARD_CENTS - MIN_REWARD_CENTS) * normalized;
+  return Math.round(reward);
+}
+
+function enhanceSkuRow(row, bounds){
+  const incentive = computeIncentiveCents(row.carbon_saving, bounds);
+  return {
+    ...row,
+    deposit_cents: incentive,
+    reward_cents: incentive
+  };
+}
+
 app.get('/api/health', (_,res)=>res.json({ok:true}));
 
 // 取得所有可販售的 SKU，提供給前台商品列表使用
 app.get('/api/sku', (req,res)=>{
+  const bounds = fetchCarbonBounds();
   const rows = db.prepare(`
     SELECT id,name,category,barcode,price_cents,deposit_cents,lane_no,stock,status,
-           carbon_saving,water_saving
+           carbon_saving,water_saving,image_url
     FROM sku WHERE status='active' ORDER BY lane_no ASC
-  `).all();
+  `).all().map(row=>enhanceSkuRow(row, bounds));
   res.json(rows);
 });
 
@@ -44,7 +78,9 @@ app.post('/api/members/resolve', (req,res)=>{
 // 小工具：抓 SKU
 function getSkuMap(ids){
   const qs = ids.map(()=>'?').join(',');
-  const rows = db.prepare(`SELECT * FROM sku WHERE id IN (${qs})`).all(...ids);
+  const bounds = fetchCarbonBounds();
+  const rows = db.prepare(`SELECT * FROM sku WHERE id IN (${qs})`).all(...ids)
+    .map(row=>enhanceSkuRow(row, bounds));
   const map = new Map(rows.map(r=>[r.id,r]));
   return map;
 }
@@ -121,8 +157,17 @@ app.post('/api/payments/:tx_id/confirm', (req,res)=>{
   if(tx.status!=='created') return res.status(400).json({error:`invalid status ${tx.status}`});
   if(!['success','fail','timeout'].includes(status)) return res.status(400).json({error:'status invalid'});
 
-  let newStatus = status==='success' ? 'paid' : 'canceled';
-  db.prepare(`UPDATE tx SET status=? WHERE id=?`).run(newStatus, tx_id);
+  let newStatus;
+  if(status === 'success'){
+    const result = completeTx(tx_id);
+    if(!result.ok){
+      return res.status(400).json({ error: result.error || 'complete tx failed' });
+    }
+    newStatus = 'done';
+  } else {
+    newStatus = 'canceled';
+    db.prepare(`UPDATE tx SET status=? WHERE id=?`).run(newStatus, tx_id);
+  }
   res.json({ tx_id, status: newStatus });
 });
 
@@ -163,28 +208,19 @@ try {
   catch (e2) { /* 已存在就忽略 */ }
 }
 
+try {
+  db.prepare(`SELECT image_url FROM sku LIMIT 1`).get();
+} catch (e) {
+  try { db.exec(`ALTER TABLE sku ADD COLUMN image_url TEXT;`); }
+  catch (e2) { /* 已存在就忽略 */ }
+}
+
 // 工具：安全扣庫存（避免負數）
 function decStock(skuId, qty=1){
   const row = db.prepare(`SELECT stock FROM sku WHERE id=?`).get(skuId);
-  if(!row || row.stock<=0) return false;
-  db.prepare(`UPDATE sku SET stock=stock-? WHERE id=? AND stock>=?`).run(qty, skuId, qty);
-  return true;
-}
-
-// 出貨嘗試（回傳 {ok, reason}）
-function attemptDispense(sku){
-  // 規則：第一次 80% 成功，若失敗 50% jam / 50% empty；可再試 2 次
-  const r = Math.random();
-  if (sku.stock <= 0) return { ok:false, reason:'empty' };
-  if (r < 0.8) {
-    // 扣庫存
-    if (decStock(sku.id, 1)){
-      sku.stock = Math.max(0, (sku.stock||0) - 1); // 同步快取資料
-      return { ok:true };
-    }
-    return { ok:false, reason:'empty' };
-  }
-  return { ok:false, reason: (Math.random()<0.5?'jam':'empty') };
+  if(!row || row.stock < qty) return false;
+  const result = db.prepare(`UPDATE sku SET stock=stock-? WHERE id=? AND stock>=?`).run(qty, skuId, qty);
+  return result.changes > 0;
 }
 
 // 取得一筆交易與品項 + SKU
@@ -198,81 +234,32 @@ function getTxFull(txId){
   return { tx, items };
 }
 
-// --- 逐品項出貨 + 部分退款 ---（一次針對某筆交易觸發出貨模擬）
-app.post('/api/dispense/:tx_id', (req,res)=>{
-  const { tx_id } = req.params;
-  const bundle = getTxFull(tx_id);
-  if(!bundle) return res.status(404).json({error:'tx not found'});
+function completeTx(txId){
+  const bundle = getTxFull(txId);
+  if(!bundle) return { ok:false, error:'tx not found' };
   const { tx, items } = bundle;
-
-  if (tx.status !== 'paid') {
-    return res.status(400).json({error:`tx status must be 'paid', got ${tx.status}`});
+  if(tx.status !== 'created' && tx.status !== 'paid'){
+    return { ok:false, error:`invalid status ${tx.status}` };
   }
-
-  const logInsert = db.prepare(`INSERT INTO dispense_log
-    (id,tx_id,sku_id,lane_no,attempt_no,result,message)
-    VALUES (?,?,?,?,?,?,?)`);
-
-  const skuRows = db.prepare(`SELECT * FROM sku WHERE id IN (${items.map(()=>'?').join(',')})`).all(...items.map(i=>i.sku_id));
-  const skuMap = new Map(skuRows.map(s=>[s.id,s]));
-
-  let refundCents = 0;
-  const resultPerItem = [];
-
   const txn = db.transaction(()=>{
-    // 設為 dispensing
-    db.prepare(`UPDATE tx SET status='dispensing' WHERE id=?`).run(tx_id);
-
-    for (const it of items){
-      let successCount = 0, failCount = 0;
-      const unitTotal = it.unit_price_cents + it.deposit_cents;
-
-      for (let q=0; q<it.qty; q++){
-        let ok = false, finalReason = 'error';
-        for (let attempt=1; attempt<=3; attempt++){
-          const sku = skuMap.get(it.sku_id);
-          const r = attemptDispense(sku); // 內含扣庫存動作
-          logInsert.run(uuidv4(), tx_id, it.sku_id, sku.lane_no, attempt, r.ok?'success':r.reason, null);
-          if (r.ok){
-            ok = true; successCount++; break;
-          } else {
-            finalReason = r.reason;
-          }
-        }
-        if (!ok){ failCount++; refundCents += unitTotal; }
+    for(const item of items){
+      if(!decStock(item.sku_id, item.qty)){
+        throw new Error(`stock insufficient: ${item.sku_id}`);
       }
-      resultPerItem.push({
-        sku_id: it.sku_id,
-        name: it.sku_name,
-        success: successCount,
-        failed: failCount,
-        refund_each_cents: unitTotal
-      });
     }
-
-    // 更新交易狀態與退款金額
-    const newStatus = (refundCents>0) ? 'done' : 'done';
-    db.prepare(`UPDATE tx SET status=?, tx_refund_cents=? WHERE id=?`)
-      .run(newStatus, refundCents, tx_id);
+    db.prepare(`UPDATE tx SET status=?, tx_refund_cents=0 WHERE id=?`).run('done', txId);
   });
-
-  try { txn(); } catch(e){ return res.status(500).json({error:e.message}); }
-
-  res.json({
-    tx_id,
-    status: refundCents>0 ? 'done' : 'done',
-    refund_cents: refundCents,
-    items: resultPerItem
-  });
-});
-
-// 讀取出貨日誌（提供給前端顯示進度）
-app.get('/api/dispense/:tx_id', (req,res)=>{
-  const rows = db.prepare(`SELECT * FROM dispense_log WHERE tx_id=? ORDER BY ts ASC, attempt_no ASC`).all(req.params.tx_id);
-  const tx = db.prepare(`SELECT id,status,total_cents,deposit_total_cents,tx_refund_cents FROM tx WHERE id=?`).get(req.params.tx_id);
-  res.json({ tx, logs: rows });
-});
-
+  try {
+    txn();
+    return { ok:true };
+  } catch (err){
+    const message = String(err.message || '');
+    const friendly = message.includes('stock insufficient')
+      ? '庫存不足，請返回商品頁重新確認'
+      : message;
+    return { ok:false, error: friendly };
+  }
+}
 
 // --- 儀表板數據：即時計算今日成效、累積與最近 7 天走勢 ---
 app.get('/api/metrics/summary', (req,res)=>{
@@ -317,23 +304,28 @@ function findUserByMem(mem){ return db.prepare(`SELECT * FROM users WHERE mem_no
 function findSku(id){ return db.prepare(`SELECT * FROM sku WHERE id=? AND status='active'`).get(id); }
 
 // 每日同 SKU 退押金次數（防濫用）
+
 function todayCountByUserSku(user_id, sku_id){
-  return db.prepare(`
+  if(!user_id) return 0;
+  const row = db.prepare(`
     SELECT COUNT(*) AS c FROM rx
     WHERE user_id=? AND sku_id=? AND date(created_at,'localtime')=date('now','localtime') AND status='accepted'
-  `).get(user_id, sku_id).c || 0;
+  `).get(user_id, sku_id);
+  return row?.c || 0;
 }
 
 app.post('/api/recycle/precheck', (req,res)=>{
   const { mem_no, code } = req.body || {};
-  if(!mem_no || !code) return res.status(400).json({error:'mem_no & code required'});
-  const user = findUserByMem(mem_no);
-  if(!user) return res.status(404).json({error:'member not found'});
+  if(!code) return res.status(400).json({error:'code required'});
+  let user = null;
+  if(mem_no){
+    user = findUserByMem(mem_no);
+    if(!user) return res.status(404).json({error:'member not found'});
+  }
 
   let sku=null, source='barcode', refundable=0, warn=null;
 
   if(code.includes('|')) {
-    // 收據碼: tx|sku|idx
     source='receipt';
     const [tx_id, sku_id] = code.split('|');
     const item = db.prepare(`SELECT ti.*, s.name AS sku_name, s.deposit_cents, s.carbon_saving, s.water_saving
@@ -343,17 +335,16 @@ app.post('/api/recycle/precheck', (req,res)=>{
     if(item.refunded_qty >= item.qty) return res.status(400).json({error:'already fully refunded'});
     sku = item; refundable = item.deposit_cents;
   } else {
-    // 產品條碼或 SKU ID
-    sku = findSku(code);
+    sku = findSku(code) || db.prepare(`SELECT * FROM sku WHERE barcode=? AND status='active'`).get(code);
     if(!sku) return res.status(404).json({error:'sku not found'});
     refundable = sku.deposit_cents;
   }
 
   if(refundable<=0) return res.status(400).json({error:'this item has no deposit'});
 
-  const daily = todayCountByUserSku(user.id, sku.sku_id || sku.id);
+  const daily = todayCountByUserSku(user?.id, sku.sku_id || sku.id);
   const LIMIT = 5;
-  if(daily >= LIMIT) warn = `今日同品已達上限 ${LIMIT} 件，可能被拒收`;
+  if(user && daily >= LIMIT) warn = `今日同品已達上限 ${LIMIT} 件，可能被拒收`;
 
   res.json({
     ok:true,
@@ -361,19 +352,23 @@ app.post('/api/recycle/precheck', (req,res)=>{
     sku_id: sku.sku_id || sku.id,
     sku_name: sku.sku_name || sku.name,
     refundable_cents: refundable,
-    carbon_credit: +( (sku.carbon_saving||0) * 0.8 ).toFixed(3), // 回收給 80% ESG 加分
+    carbon_credit: +( (sku.carbon_saving||0) * 0.8 ).toFixed(3),
     water_credit: +( (sku.water_saving||0) * 0.8 ).toFixed(1),
-    warn
+    warn,
+    mode: user ? 'member' : 'guest'
   });
 });
 
+
 app.post('/api/recycle/confirm', (req,res)=>{
   const { mem_no, code, decision='accept' } = req.body || {};
-  if(!mem_no || !code) return res.status(400).json({error:'mem_no & code required'});
-  const user = findUserByMem(mem_no);
-  if(!user) return res.status(404).json({error:'member not found'});
+  if(!code) return res.status(400).json({error:'code required'});
+  let user = null;
+  if(mem_no){
+    user = findUserByMem(mem_no);
+    if(!user) return res.status(404).json({error:'member not found'});
+  }
 
-  // 先做 precheck 邏輯，取得 sku 與 refundable
   function getSkuRef(){
     if(code.includes('|')){
       const [tx_id, sku_id] = code.split('|');
@@ -382,11 +377,10 @@ app.post('/api/recycle/confirm', (req,res)=>{
                                WHERE ti.tx_id=? AND ti.sku_id=?`).get(tx_id, sku_id);
       if(!item) throw new Error('receipt not match');
       return {source:'receipt', sku_id: sku_id, sku_name:item.sku_name, refundable:item.deposit_cents, carbon:item.carbon_saving||0, water:item.water_saving||0, tx_item_id:item.id, tx_id};
-    } else {
-      const s = findSku(code);
-      if(!s) throw new Error('sku not found');
-      return {source:'barcode', sku_id: s.id, sku_name:s.name, refundable:s.deposit_cents, carbon:s.carbon_saving||0, water:s.water_saving||0};
     }
+    const s = findSku(code) || db.prepare(`SELECT * FROM sku WHERE barcode=? AND status='active'`).get(code);
+    if(!s) throw new Error('sku not found');
+    return {source:'barcode', sku_id: s.id, sku_name:s.name, refundable:s.deposit_cents, carbon:s.carbon_saving||0, water:s.water_saving||0};
   }
 
   let info;
@@ -394,38 +388,36 @@ app.post('/api/recycle/confirm', (req,res)=>{
   if(info.refundable<=0) return res.status(400).json({error:'no deposit'});
 
   if(decision==='reject'){
-    // 記一筆拒收（可選）
-    const rxId = require('uuid').v4();
+    const rxId = uuidv4();
     db.prepare(`INSERT INTO rx(id,user_id,source,code,sku_id,refundable_cents,status) VALUES(?,?,?,?,?,?,?)`)
-      .run(rxId, user.id, info.source, code, info.sku_id, 0, 'rejected');
+      .run(rxId, user?.id || '__guest__', info.source, code, info.sku_id, 0, 'rejected');
     return res.json({ rx_id: rxId, status:'rejected' });
   }
 
-  // 受理：寫 rx、加錢到會員押金餘額、收據碼模式下遞增 refunded_qty
-  const rxId = require('uuid').v4();
+  const rxId = uuidv4();
   const txn = db.transaction(()=>{
+    const rxUserId = user?.id || '__guest__';
     db.prepare(`INSERT INTO rx(id,user_id,source,code,sku_id,refundable_cents,carbon_credit,water_credit,status)
                 VALUES(?,?,?,?,?,?,?,?, 'accepted')`)
-      .run(rxId, user.id, info.source, code, info.sku_id, info.refundable, info.carbon*0.8, info.water*0.8);
-    db.prepare(`UPDATE users SET deposit_balance_cents = deposit_balance_cents + ? WHERE id=?`)
-      .run(info.refundable, user.id);
+      .run(rxId, rxUserId, info.source, code, info.sku_id, info.refundable, info.carbon*0.8, info.water*0.8);
+    if(user){
+      db.prepare(`UPDATE users SET deposit_balance_cents = deposit_balance_cents + ? WHERE id=?`)
+        .run(info.refundable, user.id);
+    }
     if(info.source==='receipt'){
       db.prepare(`UPDATE tx_item SET refunded_qty = refunded_qty + 1 WHERE id=?`).run(info.tx_item_id);
     }
   });
   try { txn(); } catch(e){ return res.status(500).json({error:e.message}); }
 
+  const balance = user ? db.prepare(`SELECT deposit_balance_cents FROM users WHERE id=?`).get(user.id).deposit_balance_cents : null;
   res.json({
     rx_id: rxId,
     status: 'accepted',
     refunded_cents: info.refundable,
-    member_balance_cents: (db.prepare(`SELECT deposit_balance_cents FROM users WHERE id=?`).get(user.id).deposit_balance_cents),
+    member_balance_cents: balance,
   });
 });
-
-
-
-
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, ()=>console.log(`VM server on http://localhost:${PORT}`));

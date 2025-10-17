@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <link rel="stylesheet" href="/assets/styles.css">
 </head>
-<body class="min-vh-100 d-flex flex-column">
+<body class="min-vh-100 d-flex flex-column page-recycle">
   <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
     <div class="container">
       <a class="navbar-brand fw-semibold" href="/index.html"><i class="bi bi-recycle me-2"></i>循環販賣機 DEMO</a>
@@ -46,52 +46,50 @@
           </div>
         </div>
 
+
         <section class="checkout-step active" data-step="member">
-          <div class="glass-card p-4">
-            <h2 class="h5 text-secondary mb-3"><i class="bi bi-person-badge me-2"></i>Step 1｜會員卡掃描</h2>
-            <div class="d-flex flex-column flex-lg-row align-items-lg-center gap-4">
-              <div class="scan-display flex-grow-1">
-                <input id="memInput" placeholder="JCP-XXXXXX" autocomplete="off" inputmode="text">
-                <small>掃描會員卡條碼或手動輸入卡號，系統會即時驗證並顯示押金餘額。</small>
-                <button id="memberConfirm" class="btn vm-glow-button mt-2 w-100 justify-content-center"><i class="bi bi-check-circle me-2"></i>確認會員</button>
-                <div class="scan-quick-buttons mt-3" id="memberQuick">
-                  <button type="button" data-code="JCP-7F3K9C">JCP-7F3K9C</button>
-                  <button type="button" data-code="JCP-AB12CD">JCP-AB12CD</button>
+          <div class="glass-card recycle-card p-5">
+            <div class="row g-4 align-items-center">
+              <div class="col-lg-4 d-flex justify-content-center">
+                <div class="recycle-hero-icon">
+                  <i class="bi bi-person-badge"></i>
                 </div>
               </div>
-              <div class="flex-grow-1">
-                <div id="memStatus" class="glass-ring text-secondary">等待掃描會員卡...</div>
+              <div class="col-lg-8">
+                <div class="scan-display recycle-scan">
+                  <input id="memInput" placeholder="JCP-XXXXXX" autocomplete="off" inputmode="text">
+                  <small>掃描會員卡條碼或手動輸入卡號，系統會即時驗證並顯示押金餘額。</small>
+                  <button id="memberConfirm" class="btn vm-glow-button mt-3 w-100 justify-content-center"><i class="bi bi-check-circle me-2"></i>確認會員</button>
+                  <button id="guestModeBtn" class="btn btn-outline-light btn-soft mt-3 w-100"><i class="bi bi-incognito me-2"></i>改以訪客模式操作</button>
+                </div>
+                <div id="memStatus" class="glass-ring text-secondary mt-3">等待掃描會員卡...</div>
               </div>
             </div>
           </div>
         </section>
-
         <section class="checkout-step" data-step="code">
-          <div class="glass-card p-4">
-            <h2 class="h5 text-secondary mb-3"><i class="bi bi-upc me-2"></i>Step 2｜條碼 / 收據碼</h2>
-            <div class="row g-4 align-items-start">
-              <div class="col-lg-6">
-                <div class="scan-display">
+          <div class="glass-card recycle-card p-5">
+            <div class="row g-4 align-items-center">
+              <div class="col-lg-4 d-flex justify-content-center">
+                <div class="recycle-hero-icon barcode">
+                  <i class="bi bi-upc"></i>
+                </div>
+              </div>
+              <div class="col-lg-8">
+                <div class="scan-display recycle-scan">
                   <input id="codeInput" placeholder="請掃描 SKU 或收據碼" autocomplete="off">
-                  <small>掃描實品條碼或 <code>tx|sku|idx</code> 收據碼，若使用掃描槍會自動預檢。</small>
-                  <button id="precheckBtn" class="btn btn-primary mt-2"><i class="bi bi-search me-2"></i>開始預檢</button>
+                  <small>掃描實品條碼或輸入 <code>tx|sku|idx</code> 收據碼。訪客亦可直接輸入條碼試算可退押金。</small>
+                  <button id="precheckBtn" class="btn btn-primary mt-3"><i class="bi bi-search me-2"></i>開始預檢</button>
                 </div>
                 <div id="precheckStatus" class="glass-ring text-secondary gap-2 mt-3 d-none">
                   <span class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span>
                   <span>預檢中...</span>
                 </div>
-              </div>
-              <div class="col-lg-6">
-                <div class="glass-card p-4 h-100">
-                  <h3 class="h6 text-secondary mb-3"><i class="bi bi-upc-scan me-2"></i>實體條碼示範</h3>
-                  <p class="text-secondary small mb-3">以下皆為真實商品碼，可直接點擊或掃描體驗：</p>
-                  <div class="d-flex flex-wrap gap-3" id="sampleBarcodes"></div>
+                <div class="step-nav mt-4">
+                  <button class="btn btn-outline-secondary" data-step-back><i class="bi bi-arrow-left-circle me-2"></i>返回會員</button>
+                  <span></span>
                 </div>
               </div>
-            </div>
-            <div class="step-nav mt-4">
-              <button class="btn btn-outline-secondary" data-step-back><i class="bi bi-arrow-left-circle me-2"></i>返回會員</button>
-              <span></span>
             </div>
           </div>
         </section>
@@ -168,44 +166,29 @@
     const finalMessage = document.getElementById('finalMessage');
     const memStatus = document.getElementById('memStatus');
     const memberConfirmBtn = document.getElementById('memberConfirm');
-    const memberQuick = document.getElementById('memberQuick');
-    const sampleBarcodes = document.getElementById('sampleBarcodes');
+    const guestModeBtn = document.getElementById('guestModeBtn');
     const stepHint = document.getElementById('stepHint');
 
     const BADGE_MAP = { barcode:'條碼掃描', receipt:'收據碼' };
-    const SAMPLE_CODES = [
-      { code:'4710946506936', label:'津津蘆筍汁' },
-      { code:'4900005212175', label:'可口可樂 330ml' },
-      { code:'4711256812004', label:'高山烏龍茶' },
-      { code:'4710088412346', label:'無糖氣泡水' },
-      { code:'4891028705671', label:'森林莓果氣泡飲' },
-      { code:'tx-demo|sku-sparkling|1', label:'示意收據碼' }
-    ];
 
     let lastPrecheck = null;
     const stepOrder = ['member','code','result'];
     const stepBubbles = Array.from(document.querySelectorAll('.step-bubble'));
     let currentStepIndex = 0;
 
-    function renderSamples(){
-      sampleBarcodes.innerHTML = SAMPLE_CODES.map(item=>`
-        <button type="button" class="barcode-option" data-code="${item.code}">
-          <div class="vm-barcode"><span>${item.code}</span></div>
-          <div class="text-secondary small mt-2">${item.label}</div>
-        </button>
-      `).join('');
-      sampleBarcodes.querySelectorAll('button[data-code]').forEach(btn=>{
-        btn.addEventListener('click', ()=>{
-          codeInput.value = btn.dataset.code;
-          App.bootstrapToast(`已套用 ${btn.dataset.code}`, 'info');
-        });
-      });
-    }
+    const MEMBER_HINT = '請掃描會員卡後自動前往條碼掃描';
+    const GUEST_HINT = '訪客模式：可直接掃描條碼試算可退押金';
+    let guestMode = false;
+    stepHint.textContent = MEMBER_HINT;
 
     function updateStepHint(step){
+      if(guestMode && step !== 'member'){
+        stepHint.textContent = GUEST_HINT;
+        return;
+      }
       const hints = {
-        member: '請掃描會員卡後自動前往條碼掃描',
-        code: '掃描商品條碼或收據碼，若需要可點選右側示範碼',
+        member: MEMBER_HINT,
+        code: '掃描商品條碼或輸入收據碼預檢可退押金',
         result: '確認押金金額與 ESG 效益後，選擇退押或拒收'
       };
       stepHint.textContent = hints[step] || '';
@@ -250,6 +233,7 @@
 
     async function resolveMember(code){
       const mem = code.trim();
+      if(guestMode) disableGuestMode();
       if(!mem){
         App.bootstrapToast('請輸入或掃描會員卡號', 'warning');
         return;
@@ -298,8 +282,8 @@
     async function doPrecheck(){
       const mem = memInput.value.trim();
       const code = codeInput.value.trim();
-      if(!mem){
-        App.bootstrapToast('請先完成會員掃描', 'warning');
+      if(!guestMode && !mem){
+        App.bootstrapToast('請先完成會員掃描或啟用訪客模式', 'warning');
         goToStep('member');
         return;
       }
@@ -313,7 +297,7 @@
         const res = await fetch('/api/recycle/precheck',{
           method:'POST',
           headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ mem_no: mem, code })
+          body: JSON.stringify({ mem_no: guestMode ? null : mem, code })
         });
         const data = await res.json();
         if(!res.ok) throw new Error(data.error || '預檢失敗');
@@ -340,15 +324,18 @@
         const res = await fetch('/api/recycle/confirm',{
           method:'POST',
           headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ mem_no: mem, code, decision })
+          body: JSON.stringify({ mem_no: guestMode ? null : mem, code, decision })
         });
         const data = await res.json();
         if(!res.ok) throw new Error(data.error || '操作失敗');
         if(decision === 'accept'){
+          const balanceText = (data.member_balance_cents != null)
+            ? `會員押金餘額 $${(data.member_balance_cents/100).toFixed(0)}`
+            : '訪客請於現場完成押金退還。';
           finalMessage.innerHTML = `
             <div class="d-flex flex-column gap-2">
               <div class="glass-ring text-success"><i class="bi bi-check-circle me-2"></i>已退押金 $${(data.refunded_cents/100).toFixed(0)}</div>
-              <div class="text-secondary small">會員押金餘額 $${(data.member_balance_cents/100).toFixed(0)}</div>
+              <div class="text-secondary small">${balanceText}</div>
               <a class="btn btn-soft mt-2" href="/dashboard.html"><i class="bi bi-bar-chart-line me-2"></i>看 ESG 儀表板</a>
             </div>`;
         } else {
@@ -375,19 +362,56 @@
     });
 
     memberConfirmBtn.addEventListener('click', ()=>resolveMember(memInput.value));
-    memberQuick.querySelectorAll('button[data-code]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        memInput.value = btn.dataset.code;
-        resolveMember(btn.dataset.code);
-      });
+    codeInput.addEventListener('blur', ()=>{
+      if(codeInput.dataset.skipBlurRun === '1'){
+        codeInput.dataset.skipBlurRun = '';
+        return;
+      }
+      const trimmed = (codeInput.value || '').trim();
+      if(trimmed){
+        doPrecheck();
+      }
+    });
+    function enableGuestMode(){
+      guestMode = true;
+      memInput.value = '';
+      memInput.disabled = true;
+      memberConfirmBtn.disabled = true;
+      memStatus.innerHTML = `<div class="glass-ring text-info"><i class="bi bi-incognito me-2"></i>訪客模式：僅示範退押金流程。</div>`;
+      guestModeBtn.classList.add('active');
+      guestModeBtn.innerHTML = '<i class="bi bi-person-badge me-2"></i>返回會員模式';
+      stepHint.textContent = GUEST_HINT;
+      goToStep('code');
+      focusStepInput('code');
+    }
+
+    function disableGuestMode(){
+      guestMode = false;
+      memInput.disabled = false;
+      memberConfirmBtn.disabled = false;
+      memStatus.innerHTML = `<div class="glass-ring text-secondary">等待掃描會員卡...</div>`;
+      guestModeBtn.classList.remove('active');
+      guestModeBtn.innerHTML = '<i class="bi bi-incognito me-2"></i>改以訪客模式操作';
+      stepHint.textContent = MEMBER_HINT;
+    }
+
+    guestModeBtn.addEventListener('click', ()=>{
+      if(guestMode){
+        disableGuestMode();
+        goToStep('member');
+        focusStepInput('member');
+      } else {
+        enableGuestMode();
+      }
     });
 
     App.attachScanHandler('#memInput', resolveMember, { autoTrigger: true, skipEmpty: true });
-    App.attachScanHandler('#codeInput', doPrecheck, { autoTrigger: true, skipEmpty: true });
+    
 
     codeInput.addEventListener('keydown', e=>{
       if(e.key === 'Enter'){
         e.preventDefault();
+        codeInput.dataset.skipBlurRun = '1';
         doPrecheck();
       }
     });
@@ -399,7 +423,6 @@
       });
     });
 
-    renderSamples();
     focusStepInput('member');
   </script>
 </body>

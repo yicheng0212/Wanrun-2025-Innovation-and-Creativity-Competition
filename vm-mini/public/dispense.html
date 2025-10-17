@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>出貨模擬｜循環販賣機</title>
+  <title>服務調整通知｜循環販賣機</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <link rel="stylesheet" href="/assets/styles.css">
@@ -17,12 +17,11 @@
       </button>
       <div class="collapse navbar-collapse" id="mainNav">
         <ul class="navbar-nav ms-auto">
-          <li class="nav-item"><a class="nav-link" href="/index.html">體驗入口</a></li>
-          <li class="nav-item"><a class="nav-link" href="/scan.html">會員掃碼</a></li>
+          <li class="nav-item"><a class="nav-link" href="/scan.html">會員掃描</a></li>
           <li class="nav-item"><a class="nav-link" href="/shop.html">訪客購物</a></li>
           <li class="nav-item"><a class="nav-link" href="/checkout.html">結帳確認</a></li>
           <li class="nav-item"><a class="nav-link" href="/recycle.html">回收端</a></li>
-          <li class="nav-item"><a class="nav-link active" aria-current="page" href="/dispense.html">出貨模擬</a></li>
+          <li class="nav-item"><a class="nav-link" href="/dashboard.html">ESG 儀表板</a></li>
         </ul>
       </div>
     </div>
@@ -31,17 +30,14 @@
   <main class="flex-grow-1 d-flex align-items-center">
     <div class="container py-5">
       <div class="row justify-content-center">
-        <div class="col-lg-8">
-          <div class="glass-card shadow-lg p-5">
-            <span class="badge bg-purple-subtle text-primary-emphasis mb-3">Step 5</span>
-            <h1 class="fw-bold text-primary mb-3"><i class="bi bi-box-seam me-2"></i>出貨模擬</h1>
-            <p class="text-secondary mb-4">模擬真實出貨流程（成功／卡貨／缺貨），即時計算需退款押金並同步到儀表板。</p>
-
-            <div id="overview" class="bg-light rounded-4 p-4 mb-4 d-none"></div>
-            <div id="box"></div>
-            <div id="logWrapper" class="mt-4 d-none">
-              <h2 class="h5 text-secondary mb-3"><i class="bi bi-activity me-2"></i>出貨日誌</h2>
-              <div id="logList" class="list-group list-group-flush list-group-animated"></div>
+        <div class="col-lg-7 col-xl-6">
+          <div class="glass-card p-5 text-center">
+            <span class="badge bg-info-subtle text-info-emphasis hero-badge mb-3">服務調整</span>
+            <h1 class="fw-bold text-white mb-3"><i class="bi bi-gear-wide-connected me-2"></i>出貨模擬已停用</h1>
+            <p class="text-secondary mb-4">系統已改為付款成功即完成出貨扣庫存，不再需要額外的模擬流程。感謝你的理解與支持！</p>
+            <div class="d-flex flex-column flex-md-row justify-content-center gap-3">
+              <a class="btn btn-primary btn-lg px-4" href="/shop.html"><i class="bi bi-bag-heart me-2"></i>回到商品頁</a>
+              <a class="btn btn-outline-light btn-lg px-4" href="/thanks.html"><i class="bi bi-hearts me-2"></i>看看感謝頁</a>
             </div>
           </div>
         </div>
@@ -55,173 +51,5 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/assets/app.js"></script>
-  <script>
-    const url = new URL(location.href);
-    const tx = url.searchParams.get('tx');
-    const $box = document.getElementById('box');
-    const $overview = document.getElementById('overview');
-    const $logWrapper = document.getElementById('logWrapper');
-    const $logList = document.getElementById('logList');
-
-    if(!tx){
-      $box.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>缺少交易編號（tx）。</div>';
-      App.bootstrapToast('缺少交易編號', 'danger');
-    }
-
-    function presentStatus(status){
-      switch(status){
-        case 'paid': return { text:'待出貨', badge:'text-bg-success' };
-        case 'dispensing': return { text:'出貨中', badge:'text-bg-info' };
-        case 'done': return { text:'已完成', badge:'text-bg-primary' };
-        default: return { text:status, badge:'text-bg-secondary' };
-      }
-    }
-
-    async function fetchDispense(){
-      const r = await fetch(`/api/dispense/${tx}`);
-      if(!r.ok) throw new Error('讀取出貨資訊失敗');
-      return r.json();
-    }
-
-    // 顯示交易概要（狀態、金額、押金與退款）
-    function renderOverview(info){
-      if(!info) return;
-      const status = presentStatus(info.status);
-      const refund = (info.tx_refund_cents || 0) / 100;
-      const total = (info.total_cents || 0) / 100;
-      const deposit = (info.deposit_total_cents || 0) / 100;
-      $overview.innerHTML = `
-        <div class="d-flex flex-wrap gap-3 align-items-center justify-content-between">
-          <div>
-            <div class="text-secondary small">交易編號</div>
-            <div class="fw-semibold">${info.id}</div>
-          </div>
-          <div>
-            <div class="text-secondary small">狀態</div>
-            <span class="badge ${status.badge}">${status.text}</span>
-          </div>
-          <div>
-            <div class="text-secondary small">銷售金額 (含押金)</div>
-            <div class="fw-semibold">$${total.toFixed(0)}</div>
-          </div>
-          <div>
-            <div class="text-secondary small">押金合計</div>
-            <div class="fw-semibold">$${deposit.toFixed(0)}</div>
-          </div>
-          <div>
-            <div class="text-secondary small">累積退款</div>
-            <div class="fw-semibold text-warning">$${refund.toFixed(0)}</div>
-          </div>
-        </div>
-      `;
-      $overview.classList.remove('d-none');
-    }
-
-    // 將每次出貨嘗試轉為時間軸列表
-    function renderLogs(logs, nameMap){
-      if(!logs || logs.length === 0){
-        $logList.innerHTML = `<div class="list-group-item bg-transparent text-secondary">尚無出貨日誌，可按下「開始出貨」進行模擬。</div>`;
-        $logWrapper.classList.remove('d-none');
-        return;
-      }
-      $logList.innerHTML = logs.map(log=>{
-        const badgeClass = log.result === 'success' ? 'text-bg-success'
-          : log.result === 'jam' ? 'text-bg-warning'
-          : 'text-bg-danger';
-        const label = nameMap?.get(log.sku_id) || log.sku_id;
-        return `
-          <div class="list-group-item d-flex justify-content-between align-items-center">
-            <div>
-              <div class="fw-semibold">${label}</div>
-              <small class="text-secondary">料道 ${log.lane_no ?? '-'} ｜ 嘗試 ${log.attempt_no} ｜ ${new Date(log.ts).toLocaleTimeString()}</small>
-            </div>
-            <span class="badge ${badgeClass}">${log.result}</span>
-          </div>
-        `;
-      }).join('');
-      $logWrapper.classList.remove('d-none');
-    }
-
-    // 控制面板：依是否已有日誌切換按鈕文字與提示
-    function renderControls(){
-      const hasLogs = !$logWrapper.classList.contains('d-none') && $logList.children.length > 0;
-      const buttonLabel = hasLogs ? '<i class="bi bi-arrow-repeat me-2"></i>重新模擬出貨' : '<i class="bi bi-play-fill me-2"></i>開始出貨';
-      const statusText = hasLogs ? '已載入先前的出貨紀錄，可重新模擬。' : '尚未開始出貨。';
-
-      $box.innerHTML = `
-        <div class="d-flex flex-column gap-4">
-          <div class="d-flex flex-wrap gap-3 align-items-center justify-content-between">
-            <button id="go" class="btn btn-primary btn-lg">${buttonLabel}</button>
-            <div class="text-secondary small">
-              規則：每項商品最多嘗試 3 次，80% 成功率，失敗會記錄 jam / empty 並計算退款。
-            </div>
-          </div>
-          <div class="glass-card p-4">
-            <div id="logStatus" class="text-secondary">${statusText}</div>
-          </div>
-        </div>
-      `;
-
-      document.getElementById('go').addEventListener('click', runDispense);
-    }
-
-    // 進行出貨模擬並回傳結果，同時刷新畫面
-    async function runDispense(){
-      const $button = document.getElementById('go');
-      $button.disabled = true;
-      $button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>出貨中…';
-      const $logStatus = document.getElementById('logStatus');
-      try{
-        const r = await fetch(`/api/dispense/${tx}`, { method:'POST' });
-        const data = await r.json();
-        if(!r.ok) throw new Error(data.error || '出貨失敗');
-        const refund = (data.refund_cents/100).toFixed(0);
-        $logStatus.innerHTML = `
-          <div class="fw-semibold mb-2">出貨完成</div>
-          <div class="text-secondary small">需退款：$${refund}（已更新 tx_refund_cents）</div>
-          <div class="mt-2 d-flex flex-wrap gap-2">
-            <a class="btn btn-outline-primary btn-sm" href="/result.html?tx=${encodeURIComponent(tx)}"><i class="bi bi-receipt me-1"></i>回收據頁</a>
-            <a class="btn btn-outline-success btn-sm" href="/dashboard.html"><i class="bi bi-bar-chart-line me-1"></i>觀看儀表板</a>
-          </div>
-        `;
-        App.bootstrapToast('出貨模擬完成', 'success');
-        await refresh();
-      } catch(err){
-        console.error(err);
-        App.bootstrapToast(err.message, 'danger');
-        $logStatus.innerHTML = `<div class="text-danger">${err.message}</div>`;
-      } finally {
-        $button.disabled = false;
-      }
-    }
-
-    // 重新抓取交易與日誌資料，保持頁面同步
-    async function refresh(){
-      if(!tx) return;
-      try{
-        const [dispenseData, txData] = await Promise.all([
-          fetchDispense(),
-          fetch(`/api/tx/${tx}`).then(res=>res.ok?res.json():Promise.resolve({}))
-        ]);
-
-        if(!dispenseData.tx){
-          $box.innerHTML = '<div class="alert alert-danger">找不到交易或尚未付款，請確認流程。</div>';
-          return;
-        }
-
-        renderOverview(dispenseData.tx);
-
-        const nameMap = new Map((txData?.items || []).map(item=>[item.sku_id, item.sku_name]));
-        renderLogs(dispenseData.logs, nameMap);
-      } catch(err){
-        console.error(err);
-        App.bootstrapToast(err.message, 'danger');
-      } finally {
-        renderControls();
-      }
-    }
-
-    refresh();
-  </script>
 </body>
 </html>
