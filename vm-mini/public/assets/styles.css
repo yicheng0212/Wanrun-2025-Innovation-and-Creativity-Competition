@@ -98,6 +98,68 @@ body::before {
   background: linear-gradient(160deg, rgba(148, 163, 184, 0.22) 0%, rgba(148, 163, 184, 0.05) 100%);
 }
 
+.esg-dashboard .glass-card.dark .text-secondary {
+  color: rgba(226, 232, 240, 0.82) !important;
+}
+
+.esg-dashboard .glass-card.dark .text-secondary .fw-semibold {
+  color: #f8fafc;
+}
+
+.esg-dashboard .recycle-summary {
+  gap: 1.75rem;
+}
+
+.esg-dashboard .recycle-summary .metric-block {
+  flex: 1 1 0;
+}
+
+.esg-dashboard .recycle-summary .metric-value {
+  font-size: 2.6rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+@media (max-width: 575.98px) {
+  .esg-dashboard .recycle-summary {
+    text-align: center;
+    align-items: center !important;
+    gap: 1.25rem;
+  }
+  .esg-dashboard .recycle-summary .metric-value {
+    font-size: 2.2rem;
+  }
+}
+
+.esg-dashboard #refundTrendList li {
+  background: rgba(30, 41, 59, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 16px;
+  padding: 0.7rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+
+.esg-dashboard #refundTrendList li .text-secondary {
+  color: rgba(226, 232, 240, 0.78) !important;
+}
+
+.esg-dashboard #refundTrendList li .text-light {
+  color: #f8fafc !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.esg-dashboard #refundTrendList li.text-secondary {
+  justify-content: center;
+  background: rgba(148, 163, 184, 0.12);
+  border-style: dashed;
+  color: rgba(226, 232, 240, 0.72) !important;
+}
+
 .glass-ring {
   border-radius: 999px;
   padding: 0.35rem 1rem;
@@ -1398,41 +1460,66 @@ body::before {
 }
 
 .step-bubble {
-  width: 44px;
-  height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 52px;
+  color: rgba(148, 197, 255, 0.78);
+  font-weight: 600;
+  text-align: center;
+  gap: 0.45rem;
+}
+
+.step-bubble .step-index {
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   border: 1px solid rgba(148, 197, 255, 0.35);
   background: rgba(15, 23, 42, 0.75);
-  color: rgba(148, 197, 255, 0.65);
-  font-weight: 700;
+  color: rgba(148, 197, 255, 0.82);
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
-  transition: background 0.3s var(--transition-snappy), color 0.3s var(--transition-snappy), box-shadow 0.3s var(--transition-snappy);
+  font-size: 1rem;
+  font-weight: 700;
+  transition: background 0.3s var(--transition-snappy), color 0.3s var(--transition-snappy), box-shadow 0.3s var(--transition-snappy), border-color 0.3s var(--transition-snappy);
 }
 
-.step-bubble::after {
-  content: attr(data-label);
-  position: absolute;
-  bottom: -1.6rem;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(148, 197, 255, 0.75);
+.step-bubble .step-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  color: rgba(148, 197, 255, 0.76);
 }
 
 .step-bubble.active {
+  color: #fff;
+}
+
+.step-bubble.active .step-index {
   background: linear-gradient(135deg, rgba(37, 99, 235, 0.95), rgba(56, 189, 248, 0.75));
   color: #fff;
   box-shadow: 0 12px 28px rgba(37, 99, 235, 0.35);
+  border-color: transparent;
+}
+
+.step-bubble.active .step-label {
+  color: #fff;
 }
 
 .step-bubble.completed {
+  color: rgba(148, 197, 255, 0.88);
+}
+
+.step-bubble.completed .step-index {
   background: rgba(37, 99, 235, 0.28);
-  color: rgba(148, 197, 255, 0.92);
+  color: rgba(148, 197, 255, 0.94);
+  border-color: rgba(148, 197, 255, 0.3);
+}
+
+.step-bubble.completed .step-label {
+  color: rgba(148, 197, 255, 0.88);
 }
 
 .checkout-flow {
@@ -1636,9 +1723,23 @@ body::before {
     width: 100%;
   }
 
-  .step-bubble::after {
-    bottom: -1.4rem;
-    font-size: 0.65rem;
+  .step-bubbles {
+    gap: 0.6rem;
+  }
+
+  .step-bubble {
+    min-width: 46px;
+    gap: 0.35rem;
+  }
+
+  .step-bubble .step-index {
+    width: 42px;
+    height: 42px;
+  }
+
+  .step-bubble .step-label {
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
   }
 }
 

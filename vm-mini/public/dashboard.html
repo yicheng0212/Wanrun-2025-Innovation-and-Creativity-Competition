@@ -53,6 +53,10 @@
                   <div class="label">節水 (L)</div>
                   <div id="watT" class="value">-</div>
                 </div>
+                <div class="hero-stat-card">
+                  <div class="label">今日退押率</div>
+                  <div id="refundRateT" class="value">-</div>
+                </div>
               </div>
             </div>
           </div>
@@ -78,9 +82,59 @@
               <canvas id="chart"></canvas>
             </div>
           </div>
+          <div class="glass-card dark shadow-lg p-4 mt-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h2 class="h5 fw-semibold text-info mb-0"><i class="bi bi-piggy-bank me-2"></i>押金回收雷達</h2>
+              <span class="text-secondary small">收押金、退押金透明化</span>
+            </div>
+            <div class="row g-4">
+              <div class="col-md-6">
+                <div class="text-secondary text-uppercase small fw-semibold mb-2">今日節奏</div>
+                <div class="mb-2">
+                  <div class="d-flex justify-content-between small mb-1">
+                    <span class="text-secondary">應退</span>
+                    <span id="depositDueToday" class="fw-semibold">-</span>
+                  </div>
+                  <div class="d-flex justify-content-between small">
+                    <span class="text-secondary">已退</span>
+                    <span id="depositRefundToday" class="fw-semibold text-success">-</span>
+                  </div>
+                </div>
+                <div class="progress bg-dark-subtle" style="height:8px;">
+                  <div id="progressRefundToday" class="progress-bar bg-info" role="progressbar" style="width:0%" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                <div class="text-secondary small mt-2">
+                  退押率 <span id="depositRateToday">-</span> ・ 待退 <span id="depositPendingToday">-</span>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="text-secondary text-uppercase small fw-semibold mb-2">累積成效</div>
+                <div class="mb-2">
+                  <div class="d-flex justify-content-between small mb-1">
+                    <span class="text-secondary">應退</span>
+                    <span id="depositDueAll" class="fw-semibold">-</span>
+                  </div>
+                  <div class="d-flex justify-content-between small">
+                    <span class="text-secondary">已退</span>
+                    <span id="depositRefundAll" class="fw-semibold text-success">-</span>
+                  </div>
+                </div>
+                <div class="progress bg-dark-subtle" style="height:8px;">
+                  <div id="progressRefundAll" class="progress-bar bg-success" role="progressbar" style="width:0%" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                <div class="text-secondary small mt-2">
+                  退押率 <span id="depositRateAll">-</span> ・ 待退 <span id="depositPendingAll">-</span>
+                </div>
+                <div class="text-secondary small mt-3 d-flex align-items-center gap-2">
+                  <i class="bi bi-recycle text-success"></i>
+                  <span>累積回收 <span id="recycleAcceptedAllChip" class="text-success fw-semibold">-</span> 件 ・ 拒收 <span id="recycleRejectedAllChip" class="text-warning fw-semibold">-</span> 件</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="col-xl-4">
-          <div class="glass-card dark shadow-lg p-4 h-100">
+        <div class="col-xl-4 d-flex flex-column gap-4">
+          <div class="glass-card dark shadow-lg p-4 flex-grow-1">
             <h2 class="h5 text-info mb-3"><i class="bi bi-compass me-2"></i>永續動能羅盤</h2>
             <div class="gauge-wrapper mb-3">
               <canvas id="esgGauge" width="280" height="280"></canvas>
@@ -97,6 +151,8 @@
               <li class="glass-card dark-subtle p-3">
                 <div class="text-secondary small">累積押金</div>
                 <div id="depAll" class="fs-4 fw-semibold">-</div>
+                <div class="text-secondary small mt-2">已退 <span id="depAllRefunded" class="text-success fw-semibold">-</span> ・ 待退 <span id="depAllPending" class="fw-semibold">-</span></div>
+                <div class="text-secondary small">退押率 <span id="depAllRate" class="text-info fw-semibold">-</span></div>
               </li>
               <li class="glass-card dark-subtle p-3">
                 <div class="text-secondary small">累積減碳</div>
@@ -107,6 +163,30 @@
                 <div id="watAll" class="fs-5 fw-semibold">-</div>
               </li>
             </ul>
+          </div>
+          <div class="glass-card dark shadow-lg p-4">
+            <h2 class="h5 text-info mb-3"><i class="bi bi-activity me-2"></i>回收動態追蹤</h2>
+            <div class="recycle-summary d-flex flex-column flex-sm-row justify-content-between align-items-sm-end gap-4 mb-3">
+              <div class="metric-block">
+                <div class="text-secondary small text-uppercase">今日回收件數</div>
+                <div id="recycleAcceptedToday" class="metric-value text-success">-</div>
+              </div>
+              <div class="metric-block text-sm-end">
+                <div class="text-secondary small text-uppercase">今日拒收</div>
+                <div id="recycleRejectedToday" class="metric-value text-warning">-</div>
+              </div>
+            </div>
+            <div class="border-top border-secondary-subtle pt-3">
+              <div class="text-secondary small mb-2">最近三日退押進度</div>
+              <ul id="refundTrendList" class="list-unstyled d-flex flex-column gap-2 mb-3"></ul>
+              <div class="d-flex justify-content-between align-items-center">
+                <div class="text-secondary small">累積退押件數</div>
+                <div class="text-end">
+                  <div class="fw-semibold text-success" id="recycleAcceptedAll">-</div>
+                  <div class="text-secondary small">拒收 <span id="recycleRejectedAll">-</span></div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -122,36 +202,82 @@
   <script>
     const fmtMoney = cents => (window.App && App.formatMoney) ? App.formatMoney(cents) : ('$' + (Number(cents || 0)/100).toFixed(0));
     const $ = id => document.getElementById(id);
+    const formatPercent = (value, digits=1)=>{
+      const rate = Math.max(0, Math.min(1, Number(value) || 0));
+      return (rate * 100).toFixed(digits) + '%';
+    };
+    const formatCount = value => Number(value || 0).toLocaleString('zh-TW');
+    const setProgress = (el, rate)=>{
+      if(!el) return;
+      const normalized = Math.max(0, Math.min(1, Number(rate) || 0));
+      const width = (normalized * 100).toFixed(1);
+      el.style.width = width + '%';
+      el.setAttribute('aria-valuenow', width);
+    };
 
     (async()=>{
       const res = await fetch('/api/metrics/summary');
       const data = await res.json();
+      const { today, total, daily } = data;
 
-      $('revT').textContent = fmtMoney(data.today.revenue_today);
-      $('depT').textContent = fmtMoney(data.today.deposit_today);
-      $('carT').textContent = (data.today.carbon_today||0).toFixed(3)+' kg';
-      $('watT').textContent = (data.today.water_today||0).toFixed(1)+' L';
+      $('revT').textContent = fmtMoney(today.revenue_today);
+      $('depT').textContent = fmtMoney(today.deposit_today);
+      $('carT').textContent = (today.carbon_today||0).toFixed(3)+' kg';
+      $('watT').textContent = (today.water_today||0).toFixed(1)+' L';
+      $('refundRateT').textContent = formatPercent(today.deposit_refund_rate || 0);
 
-      $('revAll').textContent = fmtMoney(data.total.revenue_all);
-      $('depAll').textContent = fmtMoney(data.total.deposit_all);
-      $('carAll').textContent = (data.total.carbon_all||0).toFixed(3)+' kg';
-      $('watAll').textContent = (data.total.water_all||0).toFixed(1)+' L';
+      $('revAll').textContent = fmtMoney(total.revenue_all);
+      $('depAll').textContent = fmtMoney(total.deposit_all);
+      $('carAll').textContent = (total.carbon_all||0).toFixed(3)+' kg';
+      $('watAll').textContent = (total.water_all||0).toFixed(1)+' L';
+      $('depAllRefunded').textContent = fmtMoney(total.deposit_refunded);
+      $('depAllPending').textContent = fmtMoney(total.deposit_pending);
+      $('depAllRate').textContent = formatPercent(total.deposit_refund_rate || 0);
+
+      $('depositDueToday').textContent = fmtMoney(today.deposit_today);
+      $('depositRefundToday').textContent = fmtMoney(today.deposit_refunded);
+      $('depositPendingToday').textContent = fmtMoney(today.deposit_pending);
+      $('depositRateToday').textContent = formatPercent(today.deposit_refund_rate || 0);
+      setProgress($('progressRefundToday'), today.deposit_refund_rate);
+
+      $('depositDueAll').textContent = fmtMoney(total.deposit_all);
+      $('depositRefundAll').textContent = fmtMoney(total.deposit_refunded);
+      $('depositPendingAll').textContent = fmtMoney(total.deposit_pending);
+      $('depositRateAll').textContent = formatPercent(total.deposit_refund_rate || 0);
+      setProgress($('progressRefundAll'), total.deposit_refund_rate);
+
+      $('recycleAcceptedAllChip').textContent = formatCount(total.recycle_accepted);
+      $('recycleRejectedAllChip').textContent = formatCount(total.recycle_rejected);
+      $('recycleAcceptedToday').textContent = formatCount(today.recycle_accepted);
+      $('recycleRejectedToday').textContent = formatCount(today.recycle_rejected);
+      $('recycleAcceptedAll').textContent = formatCount(total.recycle_accepted);
+      $('recycleRejectedAll').textContent = formatCount(total.recycle_rejected);
 
       const highlightList = $('highlightList');
-      const todayRevenue = data.today.revenue_today/100;
-      const depositPool = data.today.deposit_today/100;
-      const carbon = data.today.carbon_today || 0;
-      const water = data.today.water_today || 0;
-      highlightList.innerHTML = `
-        <li><i class="bi bi-cash-coin me-2 text-info"></i>今日營收 <strong>$${todayRevenue.toFixed(0)}</strong>，押金池待退 <strong>$${depositPool.toFixed(0)}</strong></li>
-        <li><i class="bi bi-leaf me-2 text-success"></i>減碳 <strong>${carbon.toFixed(3)} kg</strong>，等同植樹 ${(carbon/0.009).toFixed(1)} 棵</li>
-        <li><i class="bi bi-droplet-half me-2 text-primary"></i>節水 <strong>${water.toFixed(1)} L</strong>，等於 ${ (water/2).toFixed(1) } 杯咖啡水量</li>
-      `;
+      if(highlightList){
+        const revenueTodayFmt = fmtMoney(today.revenue_today);
+        const depositTodayFmt = fmtMoney(today.deposit_today);
+        const refundTodayFmt = fmtMoney(today.deposit_refunded);
+        const pendingTodayFmt = fmtMoney(today.deposit_pending);
+        const refundRateTodayFmt = formatPercent(today.deposit_refund_rate || 0);
+        const carbonToday = today.carbon_today || 0;
+        const waterToday = today.water_today || 0;
+        const recycleAccepted = formatCount(today.recycle_accepted);
+        const recycleRejected = formatCount(today.recycle_rejected);
+        highlightList.innerHTML = `
+          <li><i class="bi bi-cash-coin me-2 text-info"></i>今日營收 <strong>${revenueTodayFmt}</strong>，押金池待退 <strong>${depositTodayFmt}</strong></li>
+          <li><i class="bi bi-piggy-bank me-2 text-warning"></i>已退押金 <strong>${refundTodayFmt}</strong>（${refundRateTodayFmt}），尚有 <strong>${pendingTodayFmt}</strong> 待退</li>
+          <li><i class="bi bi-leaf me-2 text-success"></i>減碳 <strong>${carbonToday.toFixed(3)} kg</strong>，等同植樹 ${(carbonToday/0.009).toFixed(1)} 棵</li>
+          <li><i class="bi bi-droplet-half me-2 text-primary"></i>節水 <strong>${waterToday.toFixed(1)} L</strong>，等於 ${(waterToday/2).toFixed(1)} 杯咖啡水量</li>
+          <li><i class="bi bi-recycle me-2 text-info"></i>今日回收 <strong>${recycleAccepted}</strong> 件，拒收 <strong>${recycleRejected}</strong> 件</li>
+        `;
+      }
 
-      const labels = data.daily.map(d=>d.d);
-      const revenue = data.daily.map(d=>(d.revenue_cents||0)/100);
-      const carbonDaily = data.daily.map(d=>(d.carbon||0));
-      const deposit = data.daily.map(d=>(d.deposit_cents||0)/100);
+      const labels = daily.map(d=>d.d);
+      const revenueSeries = daily.map(d=>(d.revenue_cents||0)/100);
+      const carbonSeries = daily.map(d=>(d.carbon||0));
+      const depositSeries = daily.map(d=>(d.deposit_cents||0)/100);
+      const refundSeries = daily.map(d=>(d.refunded_cents||0)/100);
 
       const chartCtx = document.getElementById('chart').getContext('2d');
       const gradientRevenue = chartCtx.createLinearGradient(0,0,0,320);
@@ -160,6 +286,9 @@
       const gradientCarbon = chartCtx.createLinearGradient(0,0,0,320);
       gradientCarbon.addColorStop(0,'rgba(52,211,153,0.55)');
       gradientCarbon.addColorStop(1,'rgba(52,211,153,0.05)');
+      const gradientDeposit = chartCtx.createLinearGradient(0,0,0,320);
+      gradientDeposit.addColorStop(0,'rgba(129,140,248,0.45)');
+      gradientDeposit.addColorStop(1,'rgba(129,140,248,0.08)');
 
       new Chart(chartCtx, {
         type:'bar',
@@ -167,37 +296,50 @@
           labels,
           datasets:[
             {
+              type:'bar',
+              label:'每日押金池',
+              data: depositSeries,
+              backgroundColor: gradientDeposit,
+              borderRadius:12,
+              maxBarThickness:42,
+              yAxisID:'y2',
+              order:0
+            },
+            {
+              type:'bar',
+              label:'每日退押金',
+              data: refundSeries,
+              backgroundColor:'rgba(16,185,129,0.65)',
+              borderRadius:10,
+              maxBarThickness:26,
+              yAxisID:'y2',
+              order:1
+            },
+            {
               type:'line',
               label:'每日營收',
-              data: revenue,
+              data: revenueSeries,
               borderColor:'#38bdf8',
               backgroundColor: gradientRevenue,
               tension:0.35,
               fill:true,
               borderWidth:3,
               pointRadius:4,
-              pointBackgroundColor:'#38bdf8'
-            },
-            {
-              type:'bar',
-              label:'每日押金池',
-              data: deposit,
-              backgroundColor:'rgba(129,140,248,0.4)',
-              borderRadius:10,
-              maxBarThickness:38,
-              yAxisID:'y2'
+              pointBackgroundColor:'#38bdf8',
+              order:2
             },
             {
               type:'line',
               label:'每日減碳 (kg)',
-              data: carbonDaily,
+              data: carbonSeries,
               borderColor:'#34d399',
               backgroundColor: gradientCarbon,
               yAxisID:'y1',
               tension:0.35,
               borderWidth:3,
               pointRadius:4,
-              pointBackgroundColor:'#34d399'
+              pointBackgroundColor:'#34d399',
+              order:3
             }
           ]
         },
@@ -212,13 +354,15 @@
             y1:{
               position:'right',
               grid:{display:false},
-              ticks:{color:'#bbf7d0'}
+              ticks:{color:'#bbf7d0'},
+              title:{display:true, text:'減碳 (kg)', color:'#bbf7d0', font:{size:12}}
             },
             y2:{
               position:'right',
               grid:{display:false},
               ticks:{color:'#c7d2fe'},
-              offset:true
+              offset:true,
+              title:{display:true, text:'押金 / 退押 (NT$)', color:'#c7d2fe', font:{size:12}}
             },
             x:{
               ticks:{color:'#cbd5f5'},
@@ -230,16 +374,33 @@
             tooltip:{
               backgroundColor:'rgba(15,23,42,0.9)',
               borderColor:'rgba(59,130,246,0.4)',
-              borderWidth:1
+              borderWidth:1,
+              callbacks:{
+                label(context){
+                  const label = context.dataset.label || '';
+                  const value = context.parsed.y;
+                  if(label.includes('減碳')){
+                    return `${label}: ${value.toFixed(3)} kg`;
+                  }
+                  if(label.includes('押金') || label.includes('營收')){
+                    return `${label}: ${fmtMoney(Math.round(value * 100))}`;
+                  }
+                  return `${label}: ${value}`;
+                }
+              }
             }
           }
         }
       });
 
       const gaugeCtx = document.getElementById('esgGauge').getContext('2d');
-      const carbonTotal = data.total.carbon_all || 0;
-      const waterTotal = data.total.water_all || 0;
-      const esgIndex = carbonTotal + waterTotal === 0 ? 0 : Math.min(100, ((carbon + water) / (carbonTotal + waterTotal)) * 100);
+      const carbonTotal = total.carbon_all || 0;
+      const waterTotal = total.water_all || 0;
+      const carbonToday = today.carbon_today || 0;
+      const waterToday = today.water_today || 0;
+      const esgIndex = (carbonTotal + waterTotal) === 0
+        ? 0
+        : Math.min(100, ((carbonToday + waterToday) / (carbonTotal + waterTotal)) * 100);
       $('esgIndex').textContent = esgIndex.toFixed(1) + '%';
 
       new Chart(gaugeCtx, {
@@ -260,6 +421,31 @@
           circumference:180
         }
       });
+
+      const trendList = $('refundTrendList');
+      if(trendList){
+        const recent = daily.slice(-3).reverse();
+        if(recent.length === 0){
+          trendList.innerHTML = '<li class="text-secondary small">尚無退押紀錄</li>';
+        } else {
+          trendList.innerHTML = recent.map(row=>{
+            const dateLabel = (row.d || '').slice(5) || row.d;
+            const refundText = fmtMoney(row.refunded_cents || 0);
+            const rateText = formatPercent(row.refund_rate || 0, 0);
+            const acceptedCount = formatCount(row.accepted_count);
+            const rejectedCount = formatCount(row.rejected_count);
+            const suffix = rejectedCount && rejectedCount !== '0'
+              ? `，${rejectedCount} 拒收`
+              : '';
+            return `
+              <li class="d-flex justify-content-between align-items-center">
+                <span class="text-secondary">${dateLabel}</span>
+                <span class="text-light small">${refundText} / ${rateText} ・ ${acceptedCount} 接收${suffix}</span>
+              </li>
+            `;
+          }).join('');
+        }
+      }
     })();
   </script>
 </body>

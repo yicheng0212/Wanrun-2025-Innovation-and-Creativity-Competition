@@ -21,4 +21,4 @@ INSERT OR IGNORE INTO users (id, mem_no, name) VALUES
 ('u-007','JCP-1T9S6D','心怡'),
 ('u-008','JCP-4C7B2A','家豪'),
 ('u-009','JCP-6V8U3W','佩君'),
-('u-010','JCP-0M5N4P','冠宇'),
+('u-010','JCP-0M5N4P','冠宇')

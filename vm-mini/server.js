@@ -275,7 +275,7 @@ app.get('/api/metrics/summary', (req,res)=>{
   const total = db.prepare(`
     SELECT
       IFNULL(SUM(CASE WHEN status='done' THEN total_cents - IFNULL(tx_refund_cents,0) END),0) AS revenue_all,
-      IFNULL(SUM(deposit_total_cents),0) AS deposit_all,
+      IFNULL(SUM(CASE WHEN status IN ('done','paid','dispensing') THEN deposit_total_cents END),0) AS deposit_all,
       IFNULL(SUM(carbon_saving),0) AS carbon_all,
       IFNULL(SUM(water_saving),0) AS water_all
     FROM tx;
@@ -285,7 +285,7 @@ app.get('/api/metrics/summary', (req,res)=>{
   const daily = db.prepare(`
     SELECT date(created_at,'localtime') AS d,
            SUM(total_cents - IFNULL(tx_refund_cents,0)) AS revenue_cents,
-           SUM(deposit_total_cents) AS deposit_cents,
+           SUM(CASE WHEN status IN ('done','paid','dispensing') THEN deposit_total_cents END) AS deposit_cents,
            SUM(carbon_saving) AS carbon,
            SUM(water_saving) AS water
     FROM tx
@@ -294,7 +294,81 @@ app.get('/api/metrics/summary', (req,res)=>{
     LIMIT 7;
   `).all();
 
-  res.json({ today, total, daily: daily.reverse() });
+  const depositDue = db.prepare(`
+    SELECT
+      IFNULL(SUM(CASE WHEN status IN ('done','paid','dispensing') AND date(created_at,'localtime')=date('now','localtime') THEN deposit_total_cents END),0) AS due_today,
+      IFNULL(SUM(CASE WHEN status IN ('done','paid','dispensing') THEN deposit_total_cents END),0) AS due_all
+    FROM tx;
+  `).get();
+
+  const refundStats = db.prepare(`
+    SELECT
+      IFNULL(SUM(CASE WHEN status='accepted' AND date(created_at,'localtime')=date('now','localtime') THEN refundable_cents END),0) AS refunded_today,
+      IFNULL(SUM(CASE WHEN status='accepted' THEN refundable_cents END),0) AS refunded_all,
+      IFNULL(SUM(CASE WHEN status='accepted' AND date(created_at,'localtime')=date('now','localtime') THEN 1 END),0) AS accepted_today,
+      IFNULL(SUM(CASE WHEN status='rejected' AND date(created_at,'localtime')=date('now','localtime') THEN 1 END),0) AS rejected_today,
+      IFNULL(SUM(CASE WHEN status='accepted' THEN 1 END),0) AS accepted_all,
+      IFNULL(SUM(CASE WHEN status='rejected' THEN 1 END),0) AS rejected_all
+    FROM rx;
+  `).get();
+
+  const dailyRefundRows = db.prepare(`
+    SELECT date(created_at,'localtime') AS d,
+           SUM(CASE WHEN status='accepted' THEN refundable_cents END) AS refunded_cents,
+           SUM(CASE WHEN status='accepted' THEN 1 END) AS accepted_count,
+           SUM(CASE WHEN status='rejected' THEN 1 END) AS rejected_count
+    FROM rx
+    GROUP BY date(created_at,'localtime');
+  `).all();
+
+  const refundByDate = new Map(dailyRefundRows.map(row=>[row.d, row]));
+  const dailyWithRefunds = daily.reverse().map(row=>{
+    const refundRow = refundByDate.get(row.d) || {};
+    const depositCents = row.deposit_cents || 0;
+    const refundedCents = refundRow.refunded_cents || 0;
+    return {
+      ...row,
+      refunded_cents: refundedCents,
+      refund_rate: depositCents ? refundedCents / depositCents : 0,
+      accepted_count: refundRow.accepted_count || 0,
+      rejected_count: refundRow.rejected_count || 0
+    };
+  });
+
+  const depositTodayDue = depositDue.due_today || 0;
+  const depositTotalDue = depositDue.due_all || 0;
+  const depositRefundedToday = refundStats.refunded_today || 0;
+  const depositRefundedAll = refundStats.refunded_all || 0;
+
+  const todayDepositPending = Math.max(0, depositTodayDue - depositRefundedToday);
+  const totalDepositPending = Math.max(0, depositTotalDue - depositRefundedAll);
+
+  const todayDepositRate = depositTodayDue ? depositRefundedToday / depositTodayDue : 0;
+  const totalDepositRate = depositTotalDue ? depositRefundedAll / depositTotalDue : 0;
+
+  const extendedToday = {
+    ...today,
+    deposit_refunded: depositRefundedToday,
+    deposit_pending: todayDepositPending,
+    deposit_refund_rate: todayDepositRate,
+    recycle_accepted: refundStats.accepted_today || 0,
+    recycle_rejected: refundStats.rejected_today || 0
+  };
+
+  const extendedTotal = {
+    ...total,
+    deposit_refunded: depositRefundedAll,
+    deposit_pending: totalDepositPending,
+    deposit_refund_rate: totalDepositRate,
+    recycle_accepted: refundStats.accepted_all || 0,
+    recycle_rejected: refundStats.rejected_all || 0
+  };
+
+  res.json({
+    today: extendedToday,
+    total: extendedTotal,
+    daily: dailyWithRefunds
+  });
 });
 
 
