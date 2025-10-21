@@ -18,14 +18,130 @@ try {
   /* avoid duplicate */
 }
 
+function ensureColumn(table, column, alterSql){
+  try {
+    db.prepare(`SELECT ${column} FROM ${table} LIMIT 1`).get();
+  } catch (err) {
+    try { db.exec(alterSql); } catch (err2) { /* 已存在或無法新增時忽略 */ }
+  }
+}
+
+ensureColumn('tx', 'tx_refund_cents', `ALTER TABLE tx ADD COLUMN tx_refund_cents INTEGER DEFAULT 0;`);
+ensureColumn('tx_item', 'refunded_qty', `ALTER TABLE tx_item ADD COLUMN refunded_qty INTEGER DEFAULT 0;`);
+ensureColumn('sku', 'barcode', `ALTER TABLE sku ADD COLUMN barcode TEXT;`);
+ensureColumn('sku', 'image_url', `ALTER TABLE sku ADD COLUMN image_url TEXT;`);
+
 const MIN_REWARD_CENTS = 500;
 const MAX_REWARD_CENTS = 1500;
+const ACTIVE_STATUSES_FOR_DEPOSIT = `('done','paid','dispensing')`;
+
+// 預編譯常用查詢，減少每次 API prepare 的成本
+const stmtCarbonBounds = db.prepare(`
+  SELECT MIN(carbon_saving) AS min_carbon, MAX(carbon_saving) AS max_carbon
+  FROM sku WHERE status='active'
+`);
+const stmtListActiveSku = db.prepare(`
+  SELECT id,name,category,barcode,price_cents,deposit_cents,lane_no,stock,status,
+         carbon_saving,water_saving,image_url
+  FROM sku WHERE status='active' ORDER BY lane_no ASC
+`);
+const stmtFindUserByMem = db.prepare(`SELECT * FROM users WHERE UPPER(mem_no)=UPPER(?) AND status='active'`);
+const stmtFindUserSummary = db.prepare(`SELECT mem_no,name,points,deposit_balance_cents FROM users WHERE id=?`);
+const stmtFindSkuById = db.prepare(`SELECT * FROM sku WHERE id=? AND status='active'`);
+const stmtFindSkuByBarcode = db.prepare(`SELECT * FROM sku WHERE barcode=? AND status='active'`);
+const stmtTxById = db.prepare(`SELECT * FROM tx WHERE id=?`);
+const stmtTxItemsByTx = db.prepare(`
+  SELECT ti.*, s.name AS sku_name, s.lane_no, s.stock, s.deposit_cents
+  FROM tx_item ti JOIN sku s ON s.id=ti.sku_id
+  WHERE ti.tx_id=?
+`);
+const stmtStockBySku = db.prepare(`SELECT stock FROM sku WHERE id=?`);
+const stmtUpdateStock = db.prepare(`UPDATE sku SET stock=stock-? WHERE id=? AND stock>=?`);
+const stmtUpdateTxStatus = db.prepare(`UPDATE tx SET status=? WHERE id=?`);
+const stmtIncreaseDepositBalance = db.prepare(`UPDATE users SET deposit_balance_cents = deposit_balance_cents + ? WHERE id=?`);
+const stmtTodayRxCount = db.prepare(`
+  SELECT COUNT(*) AS c FROM rx
+  WHERE user_id=? AND sku_id=? AND date(created_at,'localtime')=date('now','localtime') AND status='accepted'
+`);
+const stmtInsertTx = db.prepare(`
+  INSERT INTO tx (id,user_id,total_cents,deposit_total_cents,status,carbon_saving,water_saving)
+  VALUES (?,?,?,?,?,?,?)
+`);
+const stmtInsertTxItem = db.prepare(`
+  INSERT INTO tx_item (id,tx_id,sku_id,qty,unit_price_cents,deposit_cents,subtotal_cents)
+  VALUES (?,?,?,?,?,?,?)
+`);
+const stmtTxItemsWithName = db.prepare(`
+  SELECT ti.*, s.name AS sku_name
+  FROM tx_item ti JOIN sku s ON s.id=ti.sku_id
+  WHERE ti.tx_id=?
+`);
+const stmtMarkTxDone = db.prepare(`UPDATE tx SET status='done', tx_refund_cents=0 WHERE id=?`);
+const stmtRxReceiptLookup = db.prepare(`
+  SELECT ti.*, s.name AS sku_name, s.deposit_cents, s.carbon_saving, s.water_saving
+  FROM tx_item ti JOIN sku s ON s.id=ti.sku_id
+  WHERE ti.tx_id=? AND ti.sku_id=?
+`);
+const stmtInsertRx = db.prepare(`
+  INSERT INTO rx(id,user_id,source,code,sku_id,refundable_cents,carbon_credit,water_credit,status)
+  VALUES(?,?,?,?,?,?,?,?,?)
+`);
+const stmtUpdateTxItemRefunded = db.prepare(`UPDATE tx_item SET refunded_qty = refunded_qty + 1 WHERE id=?`);
+const stmtUserBalance = db.prepare(`SELECT deposit_balance_cents FROM users WHERE id=?`);
+const stmtMetricsToday = db.prepare(`
+  SELECT
+    IFNULL(SUM(CASE WHEN date(created_at, 'localtime')=date('now','localtime') AND status='done' THEN total_cents - IFNULL(tx_refund_cents,0) END),0) AS revenue_today,
+    IFNULL(SUM(CASE WHEN date(created_at, 'localtime')=date('now','localtime') AND status IN ${ACTIVE_STATUSES_FOR_DEPOSIT} THEN deposit_total_cents END),0) AS deposit_today,
+    IFNULL(SUM(CASE WHEN date(created_at, 'localtime')=date('now','localtime') THEN carbon_saving END),0) AS carbon_today,
+    IFNULL(SUM(CASE WHEN date(created_at, 'localtime')=date('now','localtime') THEN water_saving END),0) AS water_today
+  FROM tx
+`);
+const stmtMetricsTotal = db.prepare(`
+  SELECT
+    IFNULL(SUM(CASE WHEN status='done' THEN total_cents - IFNULL(tx_refund_cents,0) END),0) AS revenue_all,
+    IFNULL(SUM(CASE WHEN status IN ${ACTIVE_STATUSES_FOR_DEPOSIT} THEN deposit_total_cents END),0) AS deposit_all,
+    IFNULL(SUM(carbon_saving),0) AS carbon_all,
+    IFNULL(SUM(water_saving),0) AS water_all
+  FROM tx
+`);
+const stmtMetricsDaily = db.prepare(`
+  SELECT date(created_at,'localtime') AS d,
+         SUM(total_cents - IFNULL(tx_refund_cents,0)) AS revenue_cents,
+         SUM(CASE WHEN status IN ${ACTIVE_STATUSES_FOR_DEPOSIT} THEN deposit_total_cents END) AS deposit_cents,
+         SUM(carbon_saving) AS carbon,
+         SUM(water_saving) AS water
+  FROM tx
+  GROUP BY date(created_at,'localtime')
+  ORDER BY d DESC
+  LIMIT 7
+`);
+const stmtDepositDue = db.prepare(`
+  SELECT
+    IFNULL(SUM(CASE WHEN status IN ${ACTIVE_STATUSES_FOR_DEPOSIT} AND date(created_at,'localtime')=date('now','localtime') THEN deposit_total_cents END),0) AS due_today,
+    IFNULL(SUM(CASE WHEN status IN ${ACTIVE_STATUSES_FOR_DEPOSIT} THEN deposit_total_cents END),0) AS due_all
+  FROM tx
+`);
+const stmtRefundStats = db.prepare(`
+  SELECT
+    IFNULL(SUM(CASE WHEN status='accepted' AND date(created_at,'localtime')=date('now','localtime') THEN refundable_cents END),0) AS refunded_today,
+    IFNULL(SUM(CASE WHEN status='accepted' THEN refundable_cents END),0) AS refunded_all,
+    IFNULL(SUM(CASE WHEN status='accepted' AND date(created_at,'localtime')=date('now','localtime') THEN 1 END),0) AS accepted_today,
+    IFNULL(SUM(CASE WHEN status='rejected' AND date(created_at,'localtime')=date('now','localtime') THEN 1 END),0) AS rejected_today,
+    IFNULL(SUM(CASE WHEN status='accepted' THEN 1 END),0) AS accepted_all,
+    IFNULL(SUM(CASE WHEN status='rejected' THEN 1 END),0) AS rejected_all
+  FROM rx
+`);
+const stmtRefundDaily = db.prepare(`
+  SELECT date(created_at,'localtime') AS d,
+         SUM(CASE WHEN status='accepted' THEN refundable_cents END) AS refunded_cents,
+         SUM(CASE WHEN status='accepted' THEN 1 END) AS accepted_count,
+         SUM(CASE WHEN status='rejected' THEN 1 END) AS rejected_count
+  FROM rx
+  GROUP BY date(created_at,'localtime')
+`);
 
 function fetchCarbonBounds(){
-  const row = db.prepare(`
-    SELECT MIN(carbon_saving) AS min_carbon, MAX(carbon_saving) AS max_carbon
-    FROM sku WHERE status='active'
-  `).get();
+  const row = stmtCarbonBounds.get();
   return {
     min: row?.min_carbon ?? 0,
     max: row?.max_carbon ?? 0
@@ -33,6 +149,7 @@ function fetchCarbonBounds(){
 }
 
 function computeIncentiveCents(carbonSaving, bounds){
+  // 根據 SKU 減碳量動態推算押金／獎勵，落在 MIN~MAX 區間內
   const carbon = Number(carbonSaving) || 0;
   const min = bounds?.min ?? 0;
   const max = bounds?.max ?? min;
@@ -44,9 +161,10 @@ function computeIncentiveCents(carbonSaving, bounds){
 
 function enhanceSkuRow(row, bounds){
   const incentive = computeIncentiveCents(row.carbon_saving, bounds);
+  const deposit = row.deposit_cents > 0 ? row.deposit_cents : incentive;
   return {
     ...row,
-    deposit_cents: incentive,
+    deposit_cents: deposit,
     reward_cents: incentive
   };
 }
@@ -56,11 +174,7 @@ app.get('/api/health', (_,res)=>res.json({ok:true}));
 // 取得所有可販售的 SKU，提供給前台商品列表使用
 app.get('/api/sku', (req,res)=>{
   const bounds = fetchCarbonBounds();
-  const rows = db.prepare(`
-    SELECT id,name,category,barcode,price_cents,deposit_cents,lane_no,stock,status,
-           carbon_saving,water_saving,image_url
-    FROM sku WHERE status='active' ORDER BY lane_no ASC
-  `).all().map(row=>enhanceSkuRow(row, bounds));
+  const rows = stmtListActiveSku.all().map(row=>enhanceSkuRow(row, bounds));
   res.json(rows);
 });
 
@@ -68,20 +182,23 @@ app.get('/api/sku', (req,res)=>{
 // --- 會員：用 mem_no 解析 ---
 app.post('/api/members/resolve', (req,res)=>{
   const { mem_no } = req.body || {};
-  if(!mem_no) return res.status(400).json({error:'mem_no required'});
-  const user = db.prepare(`SELECT * FROM users WHERE mem_no=? AND status='active'`).get(mem_no);
+  const normalized = (mem_no ?? '').toString().trim();
+  if(!normalized) return res.status(400).json({error:'mem_no required'});
+  const user = stmtFindUserByMem.get(normalized);
   if(!user) return res.status(404).json({error:'member not found'});
   res.json({ user_id: user.id, mem_no: user.mem_no, name: user.name || '訪客',
              points: user.points, deposit_balance_cents: user.deposit_balance_cents });
 });
 
 // 小工具：抓 SKU
-function getSkuMap(ids){
-  const qs = ids.map(()=>'?').join(',');
-  const bounds = fetchCarbonBounds();
-  const rows = db.prepare(`SELECT * FROM sku WHERE id IN (${qs})`).all(...ids)
-    .map(row=>enhanceSkuRow(row, bounds));
-  const map = new Map(rows.map(r=>[r.id,r]));
+function getSkuMap(ids, bounds){
+  const map = new Map();
+  ids.forEach(id=>{
+    const row = stmtFindSkuById.get(id);
+    if(row){
+      map.set(id, enhanceSkuRow(row, bounds));
+    }
+  });
   return map;
 }
 
@@ -92,12 +209,14 @@ app.post('/api/tx', (req,res)=>{
   // 解析會員（可為空，支援訪客交易）
   let user = null;
   if(mem_no){
-    user = db.prepare(`SELECT * FROM users WHERE mem_no=? AND status='active'`).get(mem_no);
+    const normalizedMem = mem_no.toString().trim();
+    user = normalizedMem ? stmtFindUserByMem.get(normalizedMem) : null;
     if(!user) return res.status(404).json({error:'member not found'});
   }
   // 驗證 SKU 與計價，同時計算 ESG 數據
   const ids = [...new Set(items.map(i=>i.sku_id))];
-  const skuMap = getSkuMap(ids);
+  const bounds = fetchCarbonBounds();
+  const skuMap = getSkuMap(ids, bounds);
   let total = 0, depositTotal = 0, carbon = 0, water = 0;
   let pricedItems;
   try {
@@ -122,17 +241,10 @@ app.post('/api/tx', (req,res)=>{
   }
 
   const txId = uuidv4();
-  const insertTx = db.prepare(`INSERT INTO tx
-    (id,user_id,total_cents,deposit_total_cents,status,carbon_saving,water_saving)
-    VALUES (?,?,?,?,?,?,?)`);
-  const insertItem = db.prepare(`INSERT INTO tx_item
-    (id,tx_id,sku_id,qty,unit_price_cents,deposit_cents,subtotal_cents)
-    VALUES (?,?,?,?,?,?,?)`);
-
   const txn = db.transaction(()=>{
-    insertTx.run(txId, user?.id || null, total, depositTotal, 'created', carbon, water);
+    stmtInsertTx.run(txId, user?.id || null, total, depositTotal, 'created', carbon, water);
     pricedItems.forEach(pi=>{
-      insertItem.run(uuidv4(), txId, pi.sku_id, pi.qty,
+      stmtInsertTxItem.run(uuidv4(), txId, pi.sku_id, pi.qty,
         pi.unit_price_cents, pi.deposit_cents, pi.subtotal_cents);
     });
   });
@@ -152,7 +264,7 @@ app.post('/api/tx', (req,res)=>{
 app.post('/api/payments/:tx_id/confirm', (req,res)=>{
   const { tx_id } = req.params;
   const { status } = req.body || {};
-  const tx = db.prepare(`SELECT * FROM tx WHERE id=?`).get(tx_id);
+  const tx = stmtTxById.get(tx_id);
   if(!tx) return res.status(404).json({error:'tx not found'});
   if(tx.status!=='created') return res.status(400).json({error:`invalid status ${tx.status}`});
   if(!['success','fail','timeout'].includes(status)) return res.status(400).json({error:'status invalid'});
@@ -166,7 +278,7 @@ app.post('/api/payments/:tx_id/confirm', (req,res)=>{
     newStatus = 'done';
   } else {
     newStatus = 'canceled';
-    db.prepare(`UPDATE tx SET status=? WHERE id=?`).run(newStatus, tx_id);
+    stmtUpdateTxStatus.run(newStatus, tx_id);
   }
   res.json({ tx_id, status: newStatus });
 });
@@ -174,63 +286,26 @@ app.post('/api/payments/:tx_id/confirm', (req,res)=>{
 // --- 查交易（收據頁使用）---
 app.get('/api/tx/:tx_id', (req,res)=>{
   const { tx_id } = req.params;
-  const tx = db.prepare(`SELECT * FROM tx WHERE id=?`).get(tx_id);
+  const tx = stmtTxById.get(tx_id);
   if(!tx) return res.status(404).json({error:'tx not found'});
-  const items = db.prepare(`
-    SELECT ti.*, s.name AS sku_name
-    FROM tx_item ti JOIN sku s ON s.id=ti.sku_id
-    WHERE ti.tx_id=?`).all(tx_id);
-  let user=null;
-  if(tx.user_id){
-    user = db.prepare(`SELECT mem_no,name,points,deposit_balance_cents FROM users WHERE id=?`).get(tx.user_id);
-  }
+  const items = stmtTxItemsWithName.all(tx_id);
+  const user = tx.user_id ? stmtFindUserSummary.get(tx.user_id) : null;
   res.json({ tx, items, user });
 });
-// --- 啟動時保險，沒有欄位就加 ---
-try {
-  db.prepare(`SELECT tx_refund_cents FROM tx LIMIT 1`).get();
-} catch (e) {
-  try { db.exec(`ALTER TABLE tx ADD COLUMN tx_refund_cents INTEGER DEFAULT 0;`); }
-  catch (e2) { /* 已存在就忽略 */ }
-}
-
-try {
-  db.prepare(`SELECT refunded_qty FROM tx_item LIMIT 1`).get();
-} catch (e) {
-  try { db.exec(`ALTER TABLE tx_item ADD COLUMN refunded_qty INTEGER DEFAULT 0;`); }
-  catch (e2) { /* 已存在就忽略 */ }
-}
-
-try {
-  db.prepare(`SELECT barcode FROM sku LIMIT 1`).get();
-} catch (e) {
-  try { db.exec(`ALTER TABLE sku ADD COLUMN barcode TEXT;`); }
-  catch (e2) { /* 已存在就忽略 */ }
-}
-
-try {
-  db.prepare(`SELECT image_url FROM sku LIMIT 1`).get();
-} catch (e) {
-  try { db.exec(`ALTER TABLE sku ADD COLUMN image_url TEXT;`); }
-  catch (e2) { /* 已存在就忽略 */ }
-}
 
 // 工具：安全扣庫存（避免負數）
 function decStock(skuId, qty=1){
-  const row = db.prepare(`SELECT stock FROM sku WHERE id=?`).get(skuId);
+  const row = stmtStockBySku.get(skuId);
   if(!row || row.stock < qty) return false;
-  const result = db.prepare(`UPDATE sku SET stock=stock-? WHERE id=? AND stock>=?`).run(qty, skuId, qty);
+  const result = stmtUpdateStock.run(qty, skuId, qty);
   return result.changes > 0;
 }
 
 // 取得一筆交易與品項 + SKU
 function getTxFull(txId){
-  const tx = db.prepare(`SELECT * FROM tx WHERE id=?`).get(txId);
+  const tx = stmtTxById.get(txId);
   if(!tx) return null;
-  const items = db.prepare(`
-    SELECT ti.*, s.name AS sku_name, s.lane_no, s.stock, s.deposit_cents
-    FROM tx_item ti JOIN sku s ON s.id=ti.sku_id
-    WHERE ti.tx_id=?`).all(txId);
+  const items = stmtTxItemsByTx.all(txId);
   return { tx, items };
 }
 
@@ -247,7 +322,7 @@ function completeTx(txId){
         throw new Error(`stock insufficient: ${item.sku_id}`);
       }
     }
-    db.prepare(`UPDATE tx SET status=?, tx_refund_cents=0 WHERE id=?`).run('done', txId);
+    stmtMarkTxDone.run(txId);
   });
   try {
     txn();
@@ -263,66 +338,15 @@ function completeTx(txId){
 
 // --- 儀表板數據：即時計算今日成效、累積與最近 7 天走勢 ---
 app.get('/api/metrics/summary', (req,res)=>{
-  const today = db.prepare(`
-    SELECT
-      IFNULL(SUM(CASE WHEN date(created_at, 'localtime')=date('now','localtime') AND status='done' THEN total_cents - IFNULL(tx_refund_cents,0) END),0) AS revenue_today,
-      IFNULL(SUM(CASE WHEN date(created_at, 'localtime')=date('now','localtime') AND status IN ('paid','dispensing','done') THEN deposit_total_cents END),0) AS deposit_today,
-      IFNULL(SUM(CASE WHEN date(created_at, 'localtime')=date('now','localtime') THEN carbon_saving END),0) AS carbon_today,
-      IFNULL(SUM(CASE WHEN date(created_at, 'localtime')=date('now','localtime') THEN water_saving END),0) AS water_today
-    FROM tx;
-  `).get();
-
-  const total = db.prepare(`
-    SELECT
-      IFNULL(SUM(CASE WHEN status='done' THEN total_cents - IFNULL(tx_refund_cents,0) END),0) AS revenue_all,
-      IFNULL(SUM(CASE WHEN status IN ('done','paid','dispensing') THEN deposit_total_cents END),0) AS deposit_all,
-      IFNULL(SUM(carbon_saving),0) AS carbon_all,
-      IFNULL(SUM(water_saving),0) AS water_all
-    FROM tx;
-  `).get();
-
-  // 最近7天（畫折線圖）
-  const daily = db.prepare(`
-    SELECT date(created_at,'localtime') AS d,
-           SUM(total_cents - IFNULL(tx_refund_cents,0)) AS revenue_cents,
-           SUM(CASE WHEN status IN ('done','paid','dispensing') THEN deposit_total_cents END) AS deposit_cents,
-           SUM(carbon_saving) AS carbon,
-           SUM(water_saving) AS water
-    FROM tx
-    GROUP BY date(created_at,'localtime')
-    ORDER BY d DESC
-    LIMIT 7;
-  `).all();
-
-  const depositDue = db.prepare(`
-    SELECT
-      IFNULL(SUM(CASE WHEN status IN ('done','paid','dispensing') AND date(created_at,'localtime')=date('now','localtime') THEN deposit_total_cents END),0) AS due_today,
-      IFNULL(SUM(CASE WHEN status IN ('done','paid','dispensing') THEN deposit_total_cents END),0) AS due_all
-    FROM tx;
-  `).get();
-
-  const refundStats = db.prepare(`
-    SELECT
-      IFNULL(SUM(CASE WHEN status='accepted' AND date(created_at,'localtime')=date('now','localtime') THEN refundable_cents END),0) AS refunded_today,
-      IFNULL(SUM(CASE WHEN status='accepted' THEN refundable_cents END),0) AS refunded_all,
-      IFNULL(SUM(CASE WHEN status='accepted' AND date(created_at,'localtime')=date('now','localtime') THEN 1 END),0) AS accepted_today,
-      IFNULL(SUM(CASE WHEN status='rejected' AND date(created_at,'localtime')=date('now','localtime') THEN 1 END),0) AS rejected_today,
-      IFNULL(SUM(CASE WHEN status='accepted' THEN 1 END),0) AS accepted_all,
-      IFNULL(SUM(CASE WHEN status='rejected' THEN 1 END),0) AS rejected_all
-    FROM rx;
-  `).get();
-
-  const dailyRefundRows = db.prepare(`
-    SELECT date(created_at,'localtime') AS d,
-           SUM(CASE WHEN status='accepted' THEN refundable_cents END) AS refunded_cents,
-           SUM(CASE WHEN status='accepted' THEN 1 END) AS accepted_count,
-           SUM(CASE WHEN status='rejected' THEN 1 END) AS rejected_count
-    FROM rx
-    GROUP BY date(created_at,'localtime');
-  `).all();
+  const today = stmtMetricsToday.get();
+  const total = stmtMetricsTotal.get();
+  const dailyRaw = stmtMetricsDaily.all();
+  const depositDue = stmtDepositDue.get();
+  const refundStats = stmtRefundStats.get();
+  const dailyRefundRows = stmtRefundDaily.all();
 
   const refundByDate = new Map(dailyRefundRows.map(row=>[row.d, row]));
-  const dailyWithRefunds = daily.reverse().map(row=>{
+  const dailyWithRefunds = dailyRaw.reverse().map(row=>{
     const refundRow = refundByDate.get(row.d) || {};
     const depositCents = row.deposit_cents || 0;
     const refundedCents = refundRow.refunded_cents || 0;
@@ -372,19 +396,20 @@ app.get('/api/metrics/summary', (req,res)=>{
 });
 
 
-// 取得會員
-function findUserByMem(mem){ return db.prepare(`SELECT * FROM users WHERE mem_no=? AND status='active'`).get(mem); }
-// 取得 sku
-function findSku(id){ return db.prepare(`SELECT * FROM sku WHERE id=? AND status='active'`).get(id); }
+// 取得會員與 SKU 共用查詢
+function findUserByMem(mem){
+  if(!mem) return null;
+  const normalized = mem.toString().trim();
+  if(!normalized) return null;
+  return stmtFindUserByMem.get(normalized);
+}
+function findSku(id){ return stmtFindSkuById.get(id); }
+function findSkuByBarcode(code){ return stmtFindSkuByBarcode.get(code); }
 
 // 每日同 SKU 退押金次數（防濫用）
-
 function todayCountByUserSku(user_id, sku_id){
   if(!user_id) return 0;
-  const row = db.prepare(`
-    SELECT COUNT(*) AS c FROM rx
-    WHERE user_id=? AND sku_id=? AND date(created_at,'localtime')=date('now','localtime') AND status='accepted'
-  `).get(user_id, sku_id);
+  const row = stmtTodayRxCount.get(user_id, sku_id);
   return row?.c || 0;
 }
 
@@ -402,14 +427,12 @@ app.post('/api/recycle/precheck', (req,res)=>{
   if(code.includes('|')) {
     source='receipt';
     const [tx_id, sku_id] = code.split('|');
-    const item = db.prepare(`SELECT ti.*, s.name AS sku_name, s.deposit_cents, s.carbon_saving, s.water_saving
-                             FROM tx_item ti JOIN sku s ON s.id=ti.sku_id
-                             WHERE ti.tx_id=? AND ti.sku_id=?`).get(tx_id, sku_id);
+    const item = stmtRxReceiptLookup.get(tx_id, sku_id);
     if(!item) return res.status(404).json({error:'receipt not match'});
     if(item.refunded_qty >= item.qty) return res.status(400).json({error:'already fully refunded'});
     sku = item; refundable = item.deposit_cents;
   } else {
-    sku = findSku(code) || db.prepare(`SELECT * FROM sku WHERE barcode=? AND status='active'`).get(code);
+    sku = findSku(code) || findSkuByBarcode(code);
     if(!sku) return res.status(404).json({error:'sku not found'});
     refundable = sku.deposit_cents;
   }
@@ -446,13 +469,11 @@ app.post('/api/recycle/confirm', (req,res)=>{
   function getSkuRef(){
     if(code.includes('|')){
       const [tx_id, sku_id] = code.split('|');
-      const item = db.prepare(`SELECT ti.*, s.name AS sku_name, s.deposit_cents, s.carbon_saving, s.water_saving
-                               FROM tx_item ti JOIN sku s ON s.id=ti.sku_id
-                               WHERE ti.tx_id=? AND ti.sku_id=?`).get(tx_id, sku_id);
+      const item = stmtRxReceiptLookup.get(tx_id, sku_id);
       if(!item) throw new Error('receipt not match');
       return {source:'receipt', sku_id: sku_id, sku_name:item.sku_name, refundable:item.deposit_cents, carbon:item.carbon_saving||0, water:item.water_saving||0, tx_item_id:item.id, tx_id};
     }
-    const s = findSku(code) || db.prepare(`SELECT * FROM sku WHERE barcode=? AND status='active'`).get(code);
+    const s = findSku(code) || findSkuByBarcode(code);
     if(!s) throw new Error('sku not found');
     return {source:'barcode', sku_id: s.id, sku_name:s.name, refundable:s.deposit_cents, carbon:s.carbon_saving||0, water:s.water_saving||0};
   }
@@ -463,28 +484,24 @@ app.post('/api/recycle/confirm', (req,res)=>{
 
   if(decision==='reject'){
     const rxId = uuidv4();
-    db.prepare(`INSERT INTO rx(id,user_id,source,code,sku_id,refundable_cents,status) VALUES(?,?,?,?,?,?,?)`)
-      .run(rxId, user?.id || '__guest__', info.source, code, info.sku_id, 0, 'rejected');
+    stmtInsertRx.run(rxId, user?.id || '__guest__', info.source, code, info.sku_id, 0, 0, 0, 'rejected');
     return res.json({ rx_id: rxId, status:'rejected' });
   }
 
   const rxId = uuidv4();
   const txn = db.transaction(()=>{
     const rxUserId = user?.id || '__guest__';
-    db.prepare(`INSERT INTO rx(id,user_id,source,code,sku_id,refundable_cents,carbon_credit,water_credit,status)
-                VALUES(?,?,?,?,?,?,?,?, 'accepted')`)
-      .run(rxId, rxUserId, info.source, code, info.sku_id, info.refundable, info.carbon*0.8, info.water*0.8);
+    stmtInsertRx.run(rxId, rxUserId, info.source, code, info.sku_id, info.refundable, info.carbon*0.8, info.water*0.8, 'accepted');
     if(user){
-      db.prepare(`UPDATE users SET deposit_balance_cents = deposit_balance_cents + ? WHERE id=?`)
-        .run(info.refundable, user.id);
+      stmtIncreaseDepositBalance.run(info.refundable, user.id);
     }
     if(info.source==='receipt'){
-      db.prepare(`UPDATE tx_item SET refunded_qty = refunded_qty + 1 WHERE id=?`).run(info.tx_item_id);
+      stmtUpdateTxItemRefunded.run(info.tx_item_id);
     }
   });
   try { txn(); } catch(e){ return res.status(500).json({error:e.message}); }
 
-  const balance = user ? db.prepare(`SELECT deposit_balance_cents FROM users WHERE id=?`).get(user.id).deposit_balance_cents : null;
+  const balance = user ? stmtUserBalance.get(user.id).deposit_balance_cents : null;
   res.json({
     rx_id: rxId,
     status: 'accepted',

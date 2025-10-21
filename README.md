@@ -151,6 +151,16 @@ docker compose up --build
 
 ---
 
+## 安全與部署強化建議
+
+- **API 防護**：目前為純展示環境，未實作身份驗證。若要公開部署，建議導入 API 金鑰或 OAuth，並限制敏感操作（建立交易、退押）需權限驗證。
+- **資料庫安全**：SQLite 以 `WAL` 模式運行，適合 Demo。正式上線建議改接 PostgreSQL/MySQL，並配置雲端備援與定期快照。
+- **輸入驗證**：後端已做基本欄位檢查，但可拓展為 Joi / Zod 等 schema 驗證，避免惡意 payload。記得在前端也同步檢查。
+- **日誌與稽核**：於 `server.js` 加掛 `morgan` 或自訂 middleware 記錄 API 請求與 IP，並在 `rx` / `tx` 表上保留操作人員欄位以便追蹤。
+- **部署建議**：Docker 映像建議啟用多段式建置、使用 `node:22-alpine` 時鎖定版本。上雲時可於負載平衡器開啟 HTTPS、設定 WAF 與速率限制。
+
+---
+
 ## 常見操作與 FAQ
 
 - **如何重建乾淨資料？**  
@@ -192,4 +202,3 @@ docker compose up --build
 ## 聯絡
 
 如需技術支援、客製化或整合實體機台，可透過原專案提交者聯繫，或在 Issue 中提出需求。歡迎貢獻改善、擴充更多 ESG 指標或接入第三方系統。 Let's build smarter vending together!
-

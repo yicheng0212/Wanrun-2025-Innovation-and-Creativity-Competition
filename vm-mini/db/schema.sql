@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS tx (
   status TEXT NOT NULL,               -- created / paid / dispensing / done...
   carbon_saving REAL DEFAULT 0,
   water_saving REAL DEFAULT 0,
+  tx_refund_cents INTEGER DEFAULT 0,  -- 部分退款金額（分）
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -36,7 +37,8 @@ CREATE TABLE IF NOT EXISTS tx_item (
   qty INTEGER NOT NULL,
   unit_price_cents INTEGER NOT NULL,
   deposit_cents INTEGER NOT NULL,
-  subtotal_cents INTEGER NOT NULL
+  subtotal_cents INTEGER NOT NULL,
+  refunded_qty INTEGER DEFAULT 0
 );
 
 -- 會員表（一次性比賽版，只有卡號與暱稱）
@@ -84,3 +86,10 @@ CREATE TABLE IF NOT EXISTS rx (
 -- 反重複（收據碼模式用）
 CREATE UNIQUE INDEX IF NOT EXISTS idx_rx_unique_receipt
   ON rx(code) WHERE source='receipt';
+
+-- 優化儀表板查詢：針對狀態＋日期組合建立索引
+CREATE INDEX IF NOT EXISTS idx_tx_status_created
+  ON tx(status, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_rx_status_created
+  ON rx(status, created_at);
